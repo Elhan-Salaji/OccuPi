@@ -11,13 +11,11 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import java.time.Instant;
 import java.util.stream.Stream;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.assertj.core.api.Assertions.within;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
+import static org.assertj.core.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -28,162 +26,86 @@ class ForecastServiceImplTest {
 
     private ForecastServiceImpl service;
 
+    // Fixed timestamp well away from slot boundaries and midnight
+    private static final Instant FIXED_TS = Instant.parse("2025-01-13T10:15:00Z");
+
     @BeforeEach
     void setUp() {
         service = new ForecastServiceImpl(influxDBClient);
-        // Mirror the @Value defaults used in production
-        ReflectionTestUtils.setField(service, "measurement", "occupancy");
-        ReflectionTestUtils.setField(service, "database", "occupi");
-        ReflectionTestUtils.setField(service, "sensorIntervalSeconds", 30);
-    }
-
-    // -------------------------------------------------------------------------
-    // Input validation
-    // -------------------------------------------------------------------------
-
-    @Test
-    @DisplayName("forecast() throws when roomId is null")
-    void forecast_nullRoomId_throws() {
-        assertThatThrownBy(() -> service.forecast(null, 30))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("roomId");
+        ReflectionTestUtils.setField(service, "measurement",  "occupancy");
+        ReflectionTestUtils.setField(service, "lookbackWeeks", 4);
+        ReflectionTestUtils.setField(service, "slotMinutes",  30);
+        ReflectionTestUtils.setField(service, "decay",        0.5);
     }
 
     @Test
-    @DisplayName("forecast() throws when roomId is blank")
+    @DisplayName("applies exponential weighting across weeks — most recent week counts most")
+    void forecast_appliesExponentialWeighting() {
+        // week 1 (weight 1.0): count=2, week 2 (0.5): count=4,
+        // week 3 (0.25): count=4, week 4 (0.125): count=6
+        // weighted avg = (2×1.0 + 4×0.5 + 4×0.25 + 6×0.125) / (1.0+0.5+0.25+0.125)
+        //              = (2 + 2 + 1 + 0.75) / 1.875 = 5.75 / 1.875 ≈ 3.067
+        when(influxDBClient.query(anyString(), any(QueryOptions.class)))
+                .thenAnswer(inv -> Stream.<Object[]>of(new Object[]{2.0, FIXED_TS}))
+                .thenAnswer(inv -> Stream.<Object[]>of(new Object[]{4.0, FIXED_TS}))
+                .thenAnswer(inv -> Stream.<Object[]>of(new Object[]{4.0, FIXED_TS}))
+                .thenAnswer(inv -> Stream.<Object[]>of(new Object[]{6.0, FIXED_TS}));
+
+        ForecastResponse response = service.forecast("room-1", 2);
+
+        assertThat(response.forecast()).hasSize(1);
+        assertThat(response.forecast().get(0).predictedCount())
+                .isCloseTo(3.067, within(0.001));
+    }
+
+    @Test
+    @DisplayName("returns empty forecast when no historical data exists")
+    void forecast_noData_returnsEmptyPoints() {
+        when(influxDBClient.query(anyString(), any(QueryOptions.class)))
+                .thenAnswer(inv -> Stream.empty());
+
+        ForecastResponse response = service.forecast("room-1", 2);
+
+        assertThat(response.forecast()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("skips weeks with missing data without skewing the average")
+    void forecast_skipsWeeksWithNoData() {
+        // Only weeks 1 and 3 return data — week 2 and 4 are empty
+        // week 1 (weight 1.0): count=4, week 3 (weight 0.25): count=8
+        // weighted avg = (4×1.0 + 8×0.25) / (1.0+0.25) = 6.0 / 1.25 = 4.8
+        when(influxDBClient.query(anyString(), any(QueryOptions.class)))
+                .thenAnswer(inv -> Stream.<Object[]>of(new Object[]{4.0, FIXED_TS}))
+                .thenAnswer(inv -> Stream.empty())
+                .thenAnswer(inv -> Stream.<Object[]>of(new Object[]{8.0, FIXED_TS}))
+                .thenAnswer(inv -> Stream.empty());
+
+        ForecastResponse response = service.forecast("room-1", 2);
+
+        assertThat(response.forecast()).hasSize(1);
+        assertThat(response.forecast().get(0).predictedCount())
+                .isCloseTo(4.8, within(0.001));
+    }
+
+    @Test
+    @DisplayName("throws on blank roomId")
     void forecast_blankRoomId_throws() {
-        assertThatThrownBy(() -> service.forecast("  ", 30))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("roomId");
+        assertThatIllegalArgumentException()
+                .isThrownBy(() -> service.forecast("  ", 2));
     }
 
     @Test
-    @DisplayName("forecast() throws when minutes is zero or negative")
-    void forecast_nonPositiveMinutes_throws() {
-        assertThatThrownBy(() -> service.forecast("room-1", 0))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("minutes");
-
-        assertThatThrownBy(() -> service.forecast("room-1", -5))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("minutes");
-    }
-
-    // -------------------------------------------------------------------------
-    // Algorithm correctness
-    // -------------------------------------------------------------------------
-
-    @Test
-    @DisplayName("predictedCount is the average of all returned count values")
-    void forecast_returnsAverageCount() {
-        // Simulate three rows with counts 2, 4, 6 → expected average = 4.0
-        when(influxDBClient.query(anyString(), any(QueryOptions.class)))
-                .thenReturn(Stream.of(
-                        new Object[]{2},
-                        new Object[]{4},
-                        new Object[]{6}
-                ));
-
-        ForecastResponse response = service.forecast("room-42", 30);
-
-        assertThat(response.predictedCount()).isCloseTo(4.0, within(0.001));
+    @DisplayName("throws on roomId with invalid characters")
+    void forecast_invalidRoomId_throws() {
+        assertThatIllegalArgumentException()
+                .isThrownBy(() -> service.forecast("room'; DROP TABLE--", 2));
     }
 
     @Test
-    @DisplayName("predictedCount is 0.0 when no historical data exists")
-    void forecast_noData_returnsZero() {
-        when(influxDBClient.query(anyString(), any(QueryOptions.class)))
-                .thenReturn(Stream.empty());
-
-        ForecastResponse response = service.forecast("room-42", 30);
-
-        assertThat(response.predictedCount()).isZero();
-    }
-
-    // -------------------------------------------------------------------------
-    // Confidence
-    // -------------------------------------------------------------------------
-
-    @Test
-    @DisplayName("confidence is 1.0 when data points fill the entire window")
-    void forecast_fullWindow_confidenceIsOne() {
-        // 30-min window, 30 s interval → 60 expected points; supply exactly 60
-        Stream<Object[]> rows = Stream.iterate(new Object[]{3}, r -> new Object[]{3}).limit(60);
-        when(influxDBClient.query(anyString(), any(QueryOptions.class))).thenReturn(rows);
-
-        ForecastResponse response = service.forecast("room-1", 30);
-
-        assertThat(response.confidence()).isCloseTo(1.0, within(0.001));
-    }
-
-    @Test
-    @DisplayName("confidence is 0.0 when no data points are available")
-    void forecast_noData_confidenceIsZero() {
-        when(influxDBClient.query(anyString(), any(QueryOptions.class)))
-                .thenReturn(Stream.empty());
-
-        ForecastResponse response = service.forecast("room-1", 30);
-
-        assertThat(response.confidence()).isZero();
-    }
-
-    @Test
-    @DisplayName("confidence is capped at 1.0 even if sensor reported more often than interval")
-    void forecast_excessData_confidenceCappedAtOne() {
-        // 60 expected, 120 actual — should not exceed 1.0
-        Stream<Object[]> rows = Stream.iterate(new Object[]{1}, r -> new Object[]{1}).limit(120);
-        when(influxDBClient.query(anyString(), any(QueryOptions.class))).thenReturn(rows);
-
-        ForecastResponse response = service.forecast("room-1", 30);
-
-        assertThat(response.confidence()).isLessThanOrEqualTo(1.0);
-    }
-
-    @Test
-    @DisplayName("confidence is proportional when window is partially populated")
-    void forecast_partialWindow_confidenceIsProportional() {
-        // 60 expected, 30 actual → confidence should be ~0.5
-        Stream<Object[]> rows = Stream.iterate(new Object[]{2}, r -> new Object[]{2}).limit(30);
-        when(influxDBClient.query(anyString(), any(QueryOptions.class))).thenReturn(rows);
-
-        ForecastResponse response = service.forecast("room-1", 30);
-
-        assertThat(response.confidence()).isCloseTo(0.5, within(0.001));
-    }
-
-    // -------------------------------------------------------------------------
-    // Response metadata
-    // -------------------------------------------------------------------------
-
-    @Test
-    @DisplayName("response carries back the original roomId and forecastMinutes")
-    void forecast_responseMetadata() {
-        when(influxDBClient.query(anyString(), any(QueryOptions.class)))
-                .thenAnswer(inv -> Stream.of(
-                        new Object[]{2},
-                        new Object[]{4},
-                        new Object[]{6}
-                ));
-
-        ForecastResponse response = service.forecast("room-99", 15);
-
-        assertThat(response.roomId()).isEqualTo("room-99");
-        assertThat(response.forecastMinutes()).isEqualTo(15);
-        assertThat(response.generatedAt()).isNotNull();
-    }
-
-    // -------------------------------------------------------------------------
-    // Resilience
-    // -------------------------------------------------------------------------
-
-    @Test
-    @DisplayName("InfluxDB query failure propagates the exception")
-    void forecast_influxFailure_propagatesException() {
-        when(influxDBClient.query(anyString(), any(QueryOptions.class)))
-                .thenThrow(new RuntimeException("connection refused"));
-
-        assertThatThrownBy(() -> service.forecast("room-1", 30))
-                .isInstanceOf(RuntimeException.class)
-                .hasMessageContaining("connection refused");
+    @DisplayName("throws on non-positive forecastHours")
+    void forecast_negativeHours_throws() {
+        assertThatIllegalArgumentException()
+                .isThrownBy(() -> service.forecast("room-1", 0));
     }
 }
