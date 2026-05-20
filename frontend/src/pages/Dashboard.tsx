@@ -2,15 +2,25 @@ import { useEffect } from 'react';
 import { useRoomStore } from '../hooks/useRoomStore';
 import { MOCK_ROOMS } from '../utils/mockData';
 import { Users, Activity } from 'lucide-react';
+import api from '../utils/api';
+import type { Room } from '../types/room'; //no function anymore
 
 export default function Dashboard() {
     // Wir holen uns die Räume und die Funktion zum Setzen aus dem Store
     const { rooms, setRooms } = useRoomStore();
 
-    // "useEffect" führt Code aus, wenn die Seite geladen wird
     useEffect(() => {
-        // Wir laden unsere Test-Daten in den globalen Speicher
-        setRooms(MOCK_ROOMS);
+        const fetchRooms = async () => {
+            try {
+                const response = await api.get<Room[]>('/rooms');
+                setRooms(response.data);
+            } catch (error) {
+                console.error("Fehler beim Laden:", error);
+                setRooms(MOCK_ROOMS);
+            }
+        };
+
+        fetchRooms();
     }, [setRooms]);
 
     return (
