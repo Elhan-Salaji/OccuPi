@@ -30,11 +30,6 @@ TLV_POINT_CLOUD = 1020
 TLV_TARGET_INDEX = 1011
 TLV_TARGET_HEIGHT = 1012
 
-# Set up logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s %(levelname)s %(message)s',
-    stream=sys.stdout)
 log = logging.getLogger(__name__)
 
 
@@ -101,12 +96,11 @@ def read_frame(data_port):
             for _ in range(num_tlvs):
                 tlv_header = data_port.read(8)
                 tlv_type, tlv_length = struct.unpack('2I', tlv_header)
-                # Commented in case we need it in future
-                # tlv_data = data_port.read(tlv_length)
 
-                # People Count
                 if tlv_type == TLV_TARGET_LIST:
                     num_targets = tlv_length // TRACK_SIZE_BYTES
-                    log.info(f"Detected person: {num_targets} targets")
+                    log.debug(f"Detected person: {num_targets} targets")
+                else:
+                    data_port.read(tlv_length)  # advance past payload to stay in sync
             return frame_num, num_targets
 
