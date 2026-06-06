@@ -39,8 +39,8 @@ export const useAuthStore = create<AuthState>((set) => ({
                 localStorage.removeItem('user');
             }
 
-        } catch (error) {
-            // Bei korrupten JSON-Daten im localStorage alles zurücksetzen
+        } catch {
+            // Reset everything if JSON data in localStorage is corrupt
             localStorage.removeItem('token');
             localStorage.removeItem('user');
             set({ user: null, token: null, isAuthenticated: false });
@@ -63,6 +63,7 @@ export const useAuthStore = create<AuthState>((set) => ({
         }
         return false;
     },
+
     // removed window.location.href. We now handle the redirect reactively via the ProtectedRoute / App layout.
     logout: () => {
         localStorage.removeItem('token');
