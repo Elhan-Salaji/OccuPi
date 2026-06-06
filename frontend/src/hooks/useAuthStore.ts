@@ -14,53 +14,61 @@ interface AuthState {
     initializeAuth: () => void;
 }
 
+const MOCK_TOKEN = 'mock-jwt-token-xyz-12345';
+
 export const useAuthStore = create<AuthState>((set) => ({
     user: null,
     token: null,
     isAuthenticated: false,
 
-    // Checks at startup whether data exists in localStorage
+    // added error handling and edited token handling
     initializeAuth: () => {
-        const token = localStorage.getItem('token');
-        const savedUser = localStorage.getItem('user');
+        try {
+            const token = localStorage.getItem('token');
+            const savedUser = localStorage.getItem('user');
 
-        if (token && savedUser) {
-            set({
-                token,
-                user: JSON.parse(savedUser),
-                isAuthenticated: true,
-            });
+            // token string must exactly match the mock token now
+            if (token === MOCK_TOKEN && savedUser) {
+                set({
+                    token,
+                    user: JSON.parse(savedUser),
+                    isAuthenticated: true,
+                });
+            } else {
+                localStorage.removeItem('token');
+                localStorage.removeItem('user');
+            }
+
+        } catch (error) {
+            // Bei korrupten JSON-Daten im localStorage alles zurücksetzen
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+            set({ user: null, token: null, isAuthenticated: false });
         }
     },
 
-    // Mock-Login
     login: async (username, password) => {
         if (username.trim() === 'admin' && password === 'admin123') {
-            const mockToken = 'mock-jwt-token-xyz-12345';
             const mockUser = { username, role: 'admin' };
 
-            localStorage.setItem('token', mockToken);
+            localStorage.setItem('token', MOCK_TOKEN);
             localStorage.setItem('user', JSON.stringify(mockUser));
 
             set({
                 user: mockUser,
-                token: mockToken,
+                token: MOCK_TOKEN,
                 isAuthenticated: true,
             });
             return true;
         }
         return false;
     },
-
-    // Logout Logik
+    // removed window.location.href. We now handle the redirect reactively via the ProtectedRoute / App layout.
     logout: () => {
         localStorage.removeItem('token');
         localStorage.removeItem('user');
         set({ user: null, token: null, isAuthenticated: false });
-        // redirect to login page, alternative over router
-        window.location.href = '/login';
     },
 }));
 
-//you stay logged in even after refresh
-useAuthStore.getState().initializeAuth();
+// the automatic call at the module level has been removed here

@@ -27,7 +27,7 @@ export const Login = () => {
             // Login successful -> redirect to dashboard
             navigate('/');
         } else {
-            setError('Ungültiger Username oder Passwort. (Nutze admin / admin123)'); //Test Daten
+            setError('Ungültiger Username oder Passwort.'); //Test Daten
         }
     };
 
@@ -45,7 +45,7 @@ export const Login = () => {
 
                 {/* validation error message */}
                 {error && (
-                    <div className="mb-4 p-3 bg-red-25 text-red-600 text-sm rounded-xl border border-red-100">
+                    <div className="mb-4 p-3 bg-red-50 text-red-600 text-sm rounded-xl border border-red-100">
                         {error}
                     </div>
                 )}
@@ -79,7 +79,7 @@ export const Login = () => {
                         />
                     </div>
 
-                    {/* Remember me & Info */}
+                    {/* Remember me & info */}
                     <div className="flex items-center justify-between text-xs text-[#6B7280] px-1">
                         <label className="flex items-center space-x-2 cursor-pointer">
                             <input type="checkbox" className="rounded border-gray-300 text-[#111827] focus:ring-[#111827]" />
@@ -87,7 +87,7 @@ export const Login = () => {
                         </label>
                     </div>
 
-                    {/* Button */}
+                    {/* button */}
                     <button
                         type="submit"
                         className="w-full mt-2 py-3.5 px-4 bg-[#111827] hover:bg-[#1F2937] text-white font-medium rounded-xl text-sm shadow-sm hover:shadow transition-all duration-200 active:scale-[0.98]"
@@ -98,7 +98,7 @@ export const Login = () => {
 
                 {/* footer*/}
                 <div className="mt-8 text-center border-t border-[#F3F4F6] pt-6">
-                    //you can add a footer message here
+                    {/* Hier kann optional eine Fußnote hin */}
                 </div>
 
             </div>

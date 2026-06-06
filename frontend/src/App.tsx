@@ -1,11 +1,20 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { useEffect } from 'react';
 import Dashboard from './pages/Dashboard';
 import { Login } from './pages/Login';
 import Rooms from './pages/Rooms';
 import Analytics from './pages/Analytics';
 import { ProtectedRoute } from './components/ProtectedRoute';
+import { useAuthStore } from './hooks/useAuthStore';
 
 function App() {
+    const initializeAuth = useAuthStore((state) => state.initializeAuth);
+
+    // fix: perform initialization cleanly on app mount
+    useEffect(() => {
+        initializeAuth();
+    }, [initializeAuth]);
+
     return (
         <Router>
             <Routes>
@@ -22,7 +31,6 @@ function App() {
                     <Route path="/analytics" element={<Analytics />} />
                 </Route>
 
-                {/* fallback for undefined routes or for tippfehler */}
                 <Route path="*" element={<Navigate to="/dashboard" replace />} />
             </Routes>
         </Router>
