@@ -3,7 +3,7 @@ package com.occupi.feature.receiver.dto;
 import java.time.Instant;
 
 public record Metrics(
-  String sensorID,
+  String sensorId,
   double cpuPercentage,
   double memoryPercentage,
   int queueSize,
