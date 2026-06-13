@@ -2,6 +2,6 @@ package com.occupi.feature.receiver;
 
 import com.occupi.feature.receiver.dto.Metrics;
 
-public interface MetricsService {
+public interface PiMetricsService {
     void process(Metrics metrics);
 }
