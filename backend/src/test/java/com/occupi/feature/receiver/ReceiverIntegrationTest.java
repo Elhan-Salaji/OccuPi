@@ -1,7 +1,7 @@
 package com.occupi.feature.receiver;
 
 import com.influxdb.v3.client.InfluxDBClient;
-import com.occupi.app.AppApplication;
+import com.occupi.AppApplication;
 import com.occupi.feature.receiver.dto.SensorData;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -10,6 +10,7 @@ import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Import;
 import org.springframework.messaging.converter.StringMessageConverter;
 import org.springframework.messaging.simp.stomp.*;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -44,6 +45,7 @@ import static org.mockito.Mockito.verify;
         webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
         classes = AppApplication.class
 )
+@Import(ReceiverIntegrationTest.TestSecurityConfig.class)
 @ActiveProfiles("test")
 class ReceiverIntegrationTest {
 

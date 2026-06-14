@@ -1,0 +1,17 @@
+# Test profile — in-memory H2 in PostgreSQL compatibility mode.
+# Replaces the real PostgreSQL datasource so JPA-backed tests and full
+# SpringBootTests run without an external database.
+spring:
+  datasource:
+    url: jdbc:h2:mem:occupi-test;DB_CLOSE_DELAY=-1;MODE=PostgreSQL
+    driver-class-name: org.h2.Driver
+    username: sa
+    password: ""
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    open-in-view: false
+
+logging:
+  level:
+    com.occupi: DEBUG
