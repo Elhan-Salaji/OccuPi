@@ -2,33 +2,39 @@ package com.occupi.app;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.web.servlet.config.annotation.CorsRegistry;
-import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+
+import java.util.List;
 
 /**
  * Global CORS configuration for HTTP endpoints.
  *
- * Allows the frontend (Vite dev server and production builds) to access
- * backend REST APIs. WebSocket CORS is configured separately in WebSocketConfig.
+ * Exposes a single {@link CorsConfigurationSource} bean that is consumed by the
+ * Spring Security filter chains (via {@code http.cors()}), so that cross-origin
+ * preflight requests are allowed through before authentication. This is required
+ * for the browser-based frontend (different origin) to call the secured REST API.
+ *
+ * WebSocket CORS is configured separately in WebSocketConfig.
  */
 @Configuration
 public class CorsConfig {
 
     @Bean
-    public WebMvcConfigurer corsConfigurer() {
-        return new WebMvcConfigurer() {
-            @Override
-            public void addCorsMappings(CorsRegistry registry) {
-                registry.addMapping("/**")
-                        .allowedOrigins(
-                                "http://localhost:5173",               // Vite dev server (default)
-                                "http://localhost:3000",               // alternative dev
-                                "https://occupi.mi.hdm-stuttgart.de"  // production
-                        )
-                        .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
-                        .allowedHeaders("*")
-                        .allowCredentials(true);
-            }
-        };
+    public CorsConfigurationSource corsConfigurationSource() {
+        CorsConfiguration config = new CorsConfiguration();
+        // Any localhost port (dev servers, test pages) + the production domain.
+        config.setAllowedOriginPatterns(List.of(
+                "http://localhost:*",
+                "https://occupi.mi.hdm-stuttgart.de"
+        ));
+        config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+        config.setAllowedHeaders(List.of("*"));
+        config.setAllowCredentials(true);
+
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/**", config);
+        return source;
     }
 }
