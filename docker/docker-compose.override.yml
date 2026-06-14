@@ -1,0 +1,34 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# LOCAL development overlay — applied automatically by `docker compose up`.
+#
+# Publishes all service ports to the host for convenience (REST, test pages,
+# Pi simulation, direct DB access) and runs in the open 'dev' profile.
+#
+# Tip: for active backend development you can run only the infra here
+# (docker compose up -d influxdb postgres keycloak) and start the backend
+# locally with `./mvnw spring-boot:run` against these ports.
+# ─────────────────────────────────────────────────────────────────────────────
+services:
+  backend:
+    environment:
+      # 'dev' = all endpoints open (no auth). Override to 'prod' to test auth locally.
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
+    ports:
+      - "8080:8080"
+
+  influxdb:
+    ports:
+      - "8181:8181"
+
+  postgres:
+    ports:
+      - "5432:5432"
+
+  keycloak:
+    environment:
+      KC_HOSTNAME: localhost
+      KC_HOSTNAME_PORT: "8180"
+      KC_HOSTNAME_STRICT: "false"
+    command: start-dev --import-realm
+    ports:
+      - "8180:8080"
