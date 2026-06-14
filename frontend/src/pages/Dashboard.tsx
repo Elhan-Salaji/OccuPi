@@ -6,7 +6,7 @@ import api from '../utils/api';
 import type { Room } from '../types/room'; //no function anymore
 
 export default function Dashboard() {
-    // Wir holen uns die Räume und die Funktion zum Setzen aus dem Store
+    // we retrieve spaces and function for setting them from the sore
     const { rooms, setRooms } = useRoomStore();
 
     useEffect(() => {
@@ -30,7 +30,7 @@ export default function Dashboard() {
                 <p className="text-gray-500">Echtzeit-Daten der mmWave-Sensoren (HdM Campus)</p>
             </header>
 
-            {/* Das Grid für die Raum-Karten */}
+            {/* grid for rooms */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {rooms.map((room) => (
                     <div key={room.id} className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 hover:shadow-md transition-shadow">
@@ -39,7 +39,7 @@ export default function Dashboard() {
                                 <h3 className="font-bold text-lg text-gray-800">{room.name}</h3>
                                 <p className="text-sm text-gray-400">{room.building} • Etage {room.floor}</p>
                             </div>
-                            {/* Ampel-System */}
+                            {/* traffic light system */}
                             <div className={`w-3 h-3 rounded-full ${
                                 room.status === 'low' ? 'bg-green-500' :
                                     room.status === 'medium' ? 'bg-yellow-500' : 'bg-red-500'
@@ -55,7 +55,7 @@ export default function Dashboard() {
                             <Activity size={20} className="text-blue-500 opacity-20" />
                         </div>
 
-                        {/* Kleiner Fortschrittsbalken */}
+                        {/* small progress bar */}
                         <div className="mt-4 w-full bg-gray-100 rounded-full h-2">
                             <div
                                 className={`h-2 rounded-full transition-all duration-500 ${
