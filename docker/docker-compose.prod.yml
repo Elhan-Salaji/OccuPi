@@ -16,6 +16,9 @@ services:
     environment:
       SPRING_PROFILES_ACTIVE: prod
       JAVA_TOOL_OPTIONS: -Xms256m -Xmx512m
+      # Keycloak is served under /auth in prod (see KC_HTTP_RELATIVE_PATH below),
+      # so the internal JWKS path includes /auth too.
+      KEYCLOAK_JWK_SET_URI: http://keycloak:8080/auth/realms/occupi/protocol/openid-connect/certs
     ports:
       - "127.0.0.1:8080:8080"   # host Nginx → backend
 
@@ -24,6 +27,8 @@ services:
       # Public host of Keycloak (behind the TLS-terminating host Nginx).
       KC_HOSTNAME: ${KC_HOSTNAME:?set KC_HOSTNAME in docker/.env}
       KC_HOSTNAME_STRICT: "true"
+      # Served under https://<host>/auth — matches the host Nginx /auth route.
+      KC_HTTP_RELATIVE_PATH: /auth
       # Trust X-Forwarded-* from the host Nginx (TLS terminated there).
       KC_PROXY_HEADERS: xforwarded
     # 'start' (not start-dev) for production; auto-builds on first run.
