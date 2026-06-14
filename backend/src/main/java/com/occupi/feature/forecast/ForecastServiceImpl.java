@@ -2,6 +2,7 @@ package com.occupi.feature.forecast;
 
 import com.influxdb.v3.client.InfluxDBClient;
 import com.influxdb.v3.client.query.QueryOptions;
+import com.occupi.feature.database.InfluxTime;
 import com.occupi.feature.forecast.dto.ForecastPoint;
 import com.occupi.feature.forecast.dto.ForecastResponse;
 import lombok.extern.slf4j.Slf4j;
@@ -62,7 +63,7 @@ public class ForecastServiceImpl implements ForecastService {
 
             queryReadings(roomId, windowStart, windowEnd).forEach(row -> {
                 double count    = ((Number) row[0]).doubleValue();
-                Instant ts      = (Instant) row[1];
+                Instant ts      = InfluxTime.toInstant(row[1]);
                 long slotKey    = toSlotKey(ts);
 
                 double[] bucket = slotBuckets.computeIfAbsent(slotKey, k -> new double[]{0.0, 0.0});
