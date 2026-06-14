@@ -40,15 +40,21 @@ In prod:
 - Only **backend** (`127.0.0.1:8080`) and **keycloak** (`127.0.0.1:8180`) are published, for the
   host's existing Nginx to reverse-proxy. **InfluxDB and Postgres are not exposed** to the host.
 - Keycloak runs with `KC_HOSTNAME` / `KC_HOSTNAME_STRICT=true` / `KC_PROXY_HEADERS=xforwarded`
-  (TLS terminated by the host Nginx).
+  and is served under **`/auth`** (`KC_HTTP_RELATIVE_PATH=/auth`), behind the host Nginx.
 
 ### Host Nginx (already present on the server)
-The reverse proxy lives on the host (not in Compose). It must:
-- terminate TLS for the public domain,
-- proxy the backend (`/api`, and `/ws` **with** WebSocket `Upgrade`/`Connection` headers) to `127.0.0.1:8080`,
-- expose Keycloak (subpath or subdomain) to `127.0.0.1:8180` forwarding `X-Forwarded-*`.
+The reverse proxy lives on the host (not in Compose). The versioned config is
+[`../deploy/nginx/occupi.conf`](../deploy/nginx/occupi.conf):
+- terminates TLS (Let's Encrypt) for `occupi.mi.hdm-stuttgart.de`,
+- `/api/` and `/ws` (with WebSocket `Upgrade`/`Connection` headers) → `127.0.0.1:8080`,
+- `/auth` → `127.0.0.1:8180` (Keycloak), forwarding `X-Forwarded-*`.
 
-> The exact Nginx config is aligned against the live server separately (server inspection pending).
+Deploy it with:
+```bash
+sudo cp deploy/nginx/occupi.conf /etc/nginx/sites-available/occupi
+sudo ln -sf /etc/nginx/sites-available/occupi /etc/nginx/sites-enabled/occupi
+sudo nginx -t && sudo systemctl reload nginx
+```
 
 ### Hardening still open (tracked)
 - **InfluxDB auth/token:** currently `--without-auth`; in prod it is at least network-isolated
