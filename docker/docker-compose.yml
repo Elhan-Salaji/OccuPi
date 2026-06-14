@@ -55,7 +55,7 @@ services:
   # PostgreSQL — hosts two databases: 'occupi' (room metadata) and 'keycloak'.
   # The 'keycloak' database is created on first start by ./postgres/init.
   postgres:
-    image: postgres:17-alpine
+    image: postgres:16
     container_name: occupi-postgres
     ports:
       - "5432:5432"
