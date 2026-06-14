@@ -6,6 +6,7 @@ import Rooms from './pages/Rooms';
 import Analytics from './pages/Analytics';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { useAuthStore } from './hooks/useAuthStore';
+import { MainLayout } from './components/MainLayout';
 
 function App() {
     const initializeAuth = useAuthStore((state) => state.initializeAuth);
@@ -26,9 +27,11 @@ function App() {
 
                 {/* protected routes */}
                 <Route element={<ProtectedRoute />}>
-                    <Route path="/dashboard" element={<Dashboard />} />
-                    <Route path="/rooms" element={<Rooms />} />
-                    <Route path="/analytics" element={<Analytics />} />
+                    <Route element={<MainLayout />}>
+                        <Route path="/dashboard" element={<Dashboard />} />
+                        <Route path="/rooms" element={<Rooms />} />
+                        <Route path="/analytics" element={<Analytics />} />
+                    </Route>
                 </Route>
 
                 <Route path="*" element={<Navigate to="/dashboard" replace />} />
