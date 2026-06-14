@@ -31,7 +31,22 @@
 		<influxdb3.version>1.8.0</influxdb3.version>
 		<!-- Pin Netty to 4.1.x — arrow-memory-netty 18.x is incompatible with Netty 4.2.x -->
 		<netty.version>4.1.118.Final</netty.version>
+		<!-- Testcontainers is not managed by the Spring Boot 4 BOM -->
+		<testcontainers.version>1.20.6</testcontainers.version>
 	</properties>
+
+	<dependencyManagement>
+		<dependencies>
+			<dependency>
+				<groupId>org.testcontainers</groupId>
+				<artifactId>testcontainers-bom</artifactId>
+				<version>${testcontainers.version}</version>
+				<type>pom</type>
+				<scope>import</scope>
+			</dependency>
+		</dependencies>
+	</dependencyManagement>
+
 	<dependencies>
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
@@ -83,6 +98,17 @@
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-data-jpa-test</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<!-- Testcontainers — real InfluxDB 3 for the read-path integration test (#126) -->
+		<dependency>
+			<groupId>org.testcontainers</groupId>
+			<artifactId>testcontainers</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.testcontainers</groupId>
+			<artifactId>junit-jupiter</artifactId>
 			<scope>test</scope>
 		</dependency>
 		<dependency>
