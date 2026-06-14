@@ -1,4 +1,4 @@
-package com.occupi.app;
+package com.occupi;
 
 import com.influxdb.v3.client.InfluxDBClient;
 import org.junit.jupiter.api.Test;
