@@ -1,8 +1,9 @@
 //Detaillierter als eine Zahl, was passiert im Moment
 export interface Occupancy{
     roomId: string;
-    timestamp: string;
     count: number;
+    confidence: number;
+    timestamp: string;
 }
 
 //Was wird in Zukunft passieren?
@@ -14,12 +15,21 @@ export interface Forecast{
 }
 
 export interface Room {
-    id: string;
+    roomId: string;
     name: string;
     building: string;
     floor: number;
-    currentOccupancy: number; // How many people are in the room?
-    maxCapacity: number;      // How many people can fit in the room?
+    capacity: number; // How many people can fit in the room?
+    count: number; // How many people are in the room?
+    confidence: number;
+    timestamp: string; //
     status: 'low' | 'medium' | 'high'; // status
-    lastUpdate: string;       // timestamp of last update
+}
+
+export interface RoomResponse {
+    roomId: string;
+    name: string;
+    building: string;
+    floor: number;
+    capacity: number;
 }
