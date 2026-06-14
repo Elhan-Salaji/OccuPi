@@ -1,0 +1,140 @@
+{
+  "realm": "occupi",
+  "enabled": true,
+  "registrationAllowed": false,
+  "loginWithEmailAllowed": false,
+  "duplicateEmailsAllowed": true,
+  "sslRequired": "external",
+  "roles": {
+    "realm": [
+      {
+        "name": "admin",
+        "description": "OccuPi administrator — may manage rooms (create/update/delete)"
+      },
+      {
+        "name": "user",
+        "description": "Standard OccuPi user — read access"
+      }
+    ]
+  },
+  "clients": [
+    {
+      "clientId": "occupi-backend",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "bearerOnly": true,
+      "standardFlowEnabled": false,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false
+    },
+    {
+      "clientId": "occupi-frontend",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": true,
+      "bearerOnly": false,
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": true,
+      "redirectUris": [
+        "http://localhost:3000/*",
+        "http://localhost:5173/*",
+        "https://occupi.mi.hdm-stuttgart.de/*"
+      ],
+      "webOrigins": [
+        "http://localhost:3000",
+        "http://localhost:5173",
+        "https://occupi.mi.hdm-stuttgart.de"
+      ]
+    }
+  ],
+  "components": {
+    "org.keycloak.storage.UserStorageProvider": [
+      {
+        "name": "hdm-ldap",
+        "providerId": "ldap",
+        "subComponents": {
+          "org.keycloak.storage.ldap.mappers.LDAPStorageMapper": [
+            {
+              "name": "username",
+              "providerId": "user-attribute-ldap-mapper",
+              "config": {
+                "ldap.attribute": ["uid"],
+                "user.model.attribute": ["username"],
+                "always.read.value.from.ldap": ["false"],
+                "is.mandatory.in.ldap": ["true"],
+                "read.only": ["true"],
+                "attribute.force.default": ["false"],
+                "is.binary.attribute": ["false"]
+              }
+            },
+            {
+              "name": "email",
+              "providerId": "user-attribute-ldap-mapper",
+              "config": {
+                "ldap.attribute": ["mail"],
+                "user.model.attribute": ["email"],
+                "always.read.value.from.ldap": ["false"],
+                "is.mandatory.in.ldap": ["false"],
+                "read.only": ["true"],
+                "attribute.force.default": ["false"],
+                "is.binary.attribute": ["false"]
+              }
+            },
+            {
+              "name": "first name",
+              "providerId": "user-attribute-ldap-mapper",
+              "config": {
+                "ldap.attribute": ["givenName"],
+                "user.model.attribute": ["firstName"],
+                "always.read.value.from.ldap": ["false"],
+                "is.mandatory.in.ldap": ["false"],
+                "read.only": ["true"],
+                "attribute.force.default": ["false"],
+                "is.binary.attribute": ["false"]
+              }
+            },
+            {
+              "name": "last name",
+              "providerId": "user-attribute-ldap-mapper",
+              "config": {
+                "ldap.attribute": ["sn"],
+                "user.model.attribute": ["lastName"],
+                "always.read.value.from.ldap": ["false"],
+                "is.mandatory.in.ldap": ["false"],
+                "read.only": ["true"],
+                "attribute.force.default": ["false"],
+                "is.binary.attribute": ["false"]
+              }
+            }
+          ]
+        },
+        "config": {
+          "enabled": ["true"],
+          "priority": ["0"],
+          "editMode": ["READ_ONLY"],
+          "syncRegistrations": ["false"],
+          "vendor": ["other"],
+          "usernameLDAPAttribute": ["uid"],
+          "rdnLDAPAttribute": ["uid"],
+          "uuidLDAPAttribute": ["uid"],
+          "userObjectClasses": ["inetOrgPerson"],
+          "connectionUrl": ["ldap://ldap.hdm-stuttgart.de:389"],
+          "usersDn": ["ou=userlist,dc=hdm-stuttgart,dc=de"],
+          "authType": ["none"],
+          "importEnabled": ["false"],
+          "batchSizeForSync": ["1000"],
+          "fullSyncPeriod": ["-1"],
+          "changedSyncPeriod": ["-1"],
+          "debug": ["false"],
+          "searchScope": ["1"],
+          "validatePasswordPolicy": ["false"],
+          "trustEmail": ["false"],
+          "connectionPooling": ["true"],
+          "pagination": ["true"]
+        }
+      }
+    ]
+  }
+}

@@ -44,3 +44,6 @@ build/
 .vscode/
 
 docker/seed.py
+
+### Local secrets ###
+docker/.env
