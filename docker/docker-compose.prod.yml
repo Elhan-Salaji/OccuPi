@@ -1,0 +1,35 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# SERVER / PRODUCTION overlay.
+#
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+#
+# Assumes an Nginx reverse proxy ALREADY runs on the host and terminates TLS.
+# Therefore only backend + keycloak are published — bound to 127.0.0.1 so they
+# are reachable by the host Nginx but NOT from the public internet. InfluxDB and
+# PostgreSQL get NO host ports at all (internal Docker network only).
+#
+# Requires docker/.env with at least: POSTGRES_PASSWORD, KEYCLOAK_ADMIN_PASSWORD,
+# KC_HOSTNAME (the public https host, e.g. occupi.mi.hdm-stuttgart.de).
+# ─────────────────────────────────────────────────────────────────────────────
+services:
+  backend:
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      JAVA_TOOL_OPTIONS: -Xms256m -Xmx512m
+    ports:
+      - "127.0.0.1:8080:8080"   # host Nginx → backend
+
+  keycloak:
+    environment:
+      # Public host of Keycloak (behind the TLS-terminating host Nginx).
+      KC_HOSTNAME: ${KC_HOSTNAME:?set KC_HOSTNAME in docker/.env}
+      KC_HOSTNAME_STRICT: "true"
+      # Trust X-Forwarded-* from the host Nginx (TLS terminated there).
+      KC_PROXY_HEADERS: xforwarded
+    # 'start' (not start-dev) for production; auto-builds on first run.
+    command: start --import-realm
+    ports:
+      - "127.0.0.1:8180:8080"   # host Nginx → keycloak
+
+  # influxdb & postgres intentionally have NO 'ports' here:
+  # they stay on the internal Docker network and are not exposed to the host.
