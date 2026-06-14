@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Outlet, Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, ChartColumn, DoorOpen, ChevronRight, ChevronLeft, LogOut } from 'lucide-react';
+import { LayoutDashboard, ChartColumn, DoorOpen, PanelLeftOpen, PanelLeftClose, LogOut } from 'lucide-react';
 
 export const MainLayout = () => {
     const location = useLocation(); // reads the current location (link gets correspondingly highlighted in color)
@@ -28,14 +28,14 @@ export const MainLayout = () => {
         <div className="min-h-screen flex bg-[#F3F4F6] text-[#1F2937] font-sans">
 
             {/* background dark blue / test - with dynamic width*/}
-            <aside className={`relative bg-[#111827] text-gray-300 flex flex-col justify-between border-r border-[#1F2937] transition-all duration-300 ease-in-out ${isCollapsed ? 'w-24' : 'w-64'}`}>
+            <aside className={`relative bg-[#111827] text-gray-300 flex flex-col justify-between border-r border-[#1F2937] transition-all duration-300 ease-in-out ${isCollapsed ? 'w-22' : 'w-64'}`}>
 
                 {/* button to collapse sidebar */}
                 <button
                     onClick={() => setIsCollapsed(!isCollapsed)}
                     className="absolute -right-3 top-7 bg-[#1F2937] border border-[#374151] text-gray-300 hover:text-white p-1 rounded-md z-10 transition-colors shadow-md"
                 >
-                    {isCollapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
+                    {isCollapsed ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />}
                 </button>
 
                 {/* logo at the top, TO DO: change logo*/}
@@ -79,10 +79,14 @@ export const MainLayout = () => {
 
                 {/* lower section */}
                 <div className="p-4 border-t border-[#1F2937]">
-                <button
-                    title={isCollapsed ? 'Logout' : undefined}
-                    className={`flex items-center p-3 rounded-xl font-medium w-full transition-all duration-200 hover:bg-red-500/10 text-gray-400 hover:text-red-400 ${isCollapsed ? 'justify-center' : ''}`}
-                >
+                    <button
+                        title={isCollapsed ? 'Logout' : undefined}
+                        className={`flex items-center rounded-xl font-medium transition-all duration-200 hover:bg-red-500/10 text-gray-400 hover:text-red-400 ${
+                            isCollapsed
+                                ? 'w-12 h-12 mx-auto justify-center' // like the buttons above
+                                : 'h-12 px-4 w-full'                 
+                        }`}
+                    >
                     <LogOut size={22} className="shrink-0" />
                     {!isCollapsed && <span className="ml-4 truncate">Logout</span>}
                 </button>
