@@ -12,6 +12,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.math.BigInteger;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -34,6 +35,13 @@ class OccupancyRepositoryTest {
     @BeforeEach
     void setUp() {
         repository = new OccupancyRepository(influxDBClient);
+    }
+
+    /** Mirrors how InfluxDB 3 returns the time column: nanoseconds since epoch. */
+    private static BigInteger nanos(Instant t) {
+        return BigInteger.valueOf(t.getEpochSecond())
+                .multiply(BigInteger.valueOf(1_000_000_000L))
+                .add(BigInteger.valueOf(t.getNano()));
     }
 
     @Nested
@@ -175,9 +183,10 @@ class OccupancyRepositoryTest {
         @DisplayName("should map the latest row to OccupancyData")
         void shouldMapLatestRow() {
             Instant ts = Instant.parse("2026-06-14T10:00:00Z");
+            // InfluxDB 3 returns the time column as nanoseconds (BigInteger), not Instant.
             when(influxDBClient.query(anyString(), any(QueryOptions.class)))
                     .thenAnswer(inv -> Stream.<Object[]>of(
-                            new Object[]{"room-101", "sensor-A", 12L, 0.9, ts}));
+                            new Object[]{"room-101", "sensor-A", 12L, 0.9, nanos(ts)}));
 
             Optional<OccupancyData> result = repository.findLatestByRoom("room-101");
 
@@ -223,8 +232,8 @@ class OccupancyRepositoryTest {
             Instant ts = Instant.parse("2026-06-14T10:00:00Z");
             when(influxDBClient.query(anyString(), any(QueryOptions.class)))
                     .thenAnswer(inv -> Stream.<Object[]>of(
-                            new Object[]{"room-101", "sensor-A", 5L, 0.8, ts},
-                            new Object[]{"room-202", "sensor-B", 20L, 0.95, ts}));
+                            new Object[]{"room-101", "sensor-A", 5L, 0.8, nanos(ts)},
+                            new Object[]{"room-202", "sensor-B", 20L, 0.95, nanos(ts)}));
 
             List<OccupancyData> result = repository.findAllLatest();
 
