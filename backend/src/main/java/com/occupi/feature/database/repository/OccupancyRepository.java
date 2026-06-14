@@ -3,6 +3,7 @@ package com.occupi.feature.database.repository;
 import com.influxdb.v3.client.InfluxDBClient;
 import com.influxdb.v3.client.Point;
 import com.influxdb.v3.client.query.QueryOptions;
+import com.occupi.feature.database.InfluxTime;
 import com.occupi.feature.database.model.OccupancyData;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -125,7 +126,7 @@ public class OccupancyRepository {
                 .sensorId((String) row[1])
                 .count(((Number) row[2]).intValue())
                 .confidence(((Number) row[3]).doubleValue())
-                .timestamp((Instant) row[4])
+                .timestamp(InfluxTime.toInstant(row[4]))
                 .build();
     }
 

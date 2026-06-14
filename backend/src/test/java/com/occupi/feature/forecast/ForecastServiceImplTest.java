@@ -11,6 +11,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import java.math.BigInteger;
 import java.time.Instant;
 import java.util.stream.Stream;
 
@@ -29,6 +30,13 @@ class ForecastServiceImplTest {
     // Fixed timestamp well away from slot boundaries and midnight
     private static final Instant FIXED_TS = Instant.parse("2025-01-13T10:15:00Z");
 
+    /** Mirrors how InfluxDB 3 returns the time column: nanoseconds since epoch. */
+    private static BigInteger nanos(Instant t) {
+        return BigInteger.valueOf(t.getEpochSecond())
+                .multiply(BigInteger.valueOf(1_000_000_000L))
+                .add(BigInteger.valueOf(t.getNano()));
+    }
+
     @BeforeEach
     void setUp() {
         service = new ForecastServiceImpl(influxDBClient);
@@ -46,10 +54,10 @@ class ForecastServiceImplTest {
         // weighted avg = (2×1.0 + 4×0.5 + 4×0.25 + 6×0.125) / (1.0+0.5+0.25+0.125)
         //              = (2 + 2 + 1 + 0.75) / 1.875 = 5.75 / 1.875 ≈ 3.067
         when(influxDBClient.query(anyString(), any(QueryOptions.class)))
-                .thenAnswer(inv -> Stream.<Object[]>of(new Object[]{2.0, FIXED_TS}))
-                .thenAnswer(inv -> Stream.<Object[]>of(new Object[]{4.0, FIXED_TS}))
-                .thenAnswer(inv -> Stream.<Object[]>of(new Object[]{4.0, FIXED_TS}))
-                .thenAnswer(inv -> Stream.<Object[]>of(new Object[]{6.0, FIXED_TS}));
+                .thenAnswer(inv -> Stream.<Object[]>of(new Object[]{2.0, nanos(FIXED_TS)}))
+                .thenAnswer(inv -> Stream.<Object[]>of(new Object[]{4.0, nanos(FIXED_TS)}))
+                .thenAnswer(inv -> Stream.<Object[]>of(new Object[]{4.0, nanos(FIXED_TS)}))
+                .thenAnswer(inv -> Stream.<Object[]>of(new Object[]{6.0, nanos(FIXED_TS)}));
 
         ForecastResponse response = service.forecast("room-1", 2);
 
@@ -76,9 +84,9 @@ class ForecastServiceImplTest {
         // week 1 (weight 1.0): count=4, week 3 (weight 0.25): count=8
         // weighted avg = (4×1.0 + 8×0.25) / (1.0+0.25) = 6.0 / 1.25 = 4.8
         when(influxDBClient.query(anyString(), any(QueryOptions.class)))
-                .thenAnswer(inv -> Stream.<Object[]>of(new Object[]{4.0, FIXED_TS}))
+                .thenAnswer(inv -> Stream.<Object[]>of(new Object[]{4.0, nanos(FIXED_TS)}))
                 .thenAnswer(inv -> Stream.empty())
-                .thenAnswer(inv -> Stream.<Object[]>of(new Object[]{8.0, FIXED_TS}))
+                .thenAnswer(inv -> Stream.<Object[]>of(new Object[]{8.0, nanos(FIXED_TS)}))
                 .thenAnswer(inv -> Stream.empty());
 
         ForecastResponse response = service.forecast("room-1", 2);
