@@ -7,15 +7,20 @@ services:
     ports:
       - "8080:8080"
     environment:
-      SPRING_PROFILES_ACTIVE: dev
+      # 'prod' enforces Keycloak JWT auth. Override to 'dev' for an open local stack.
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-prod}
       INFLUXDB_URL: http://influxdb:8181
       POSTGRES_URL: jdbc:postgresql://postgres:5432/occupi
-      POSTGRES_USER: occupi
-      POSTGRES_PASSWORD: occupi
+      POSTGRES_USER: ${POSTGRES_USER:-occupi}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-occupi}
+      # JWKS reached via the internal hostname (avoids issuer-uri host mismatch).
+      KEYCLOAK_JWK_SET_URI: http://keycloak:8080/realms/occupi/protocol/openid-connect/certs
     depends_on:
       influxdb:
         condition: service_healthy
       postgres:
+        condition: service_healthy
+      keycloak:
         condition: service_healthy
     restart: unless-stopped
 
@@ -47,7 +52,8 @@ services:
       retries: 5
     restart: unless-stopped
 
-  # PostgreSQL — stores room metadata (and will back Keycloak, see #113)
+  # PostgreSQL — hosts two databases: 'occupi' (room metadata) and 'keycloak'.
+  # The 'keycloak' database is created on first start by ./postgres/init.
   postgres:
     image: postgres:17-alpine
     container_name: occupi-postgres
@@ -55,15 +61,48 @@ services:
       - "5432:5432"
     environment:
       POSTGRES_DB: occupi
-      POSTGRES_USER: occupi
-      POSTGRES_PASSWORD: occupi
+      POSTGRES_USER: ${POSTGRES_USER:-occupi}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-occupi}
     volumes:
       - postgres-data:/var/lib/postgresql/data
+      - ./postgres/init:/docker-entrypoint-initdb.d:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U occupi -d occupi"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-occupi}"]
       interval: 5s
       timeout: 3s
       retries: 5
+    restart: unless-stopped
+
+  # Keycloak — OIDC provider federating the HdM LDAP; imports the occupi realm.
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.2
+    container_name: occupi-keycloak
+    ports:
+      - "8180:8080"
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_ADMIN:-admin}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-admin}
+      KC_HOSTNAME: ${KC_HOSTNAME:-localhost}
+      KC_HOSTNAME_PORT: ${KC_HOSTNAME_PORT:-8180}
+      KC_HOSTNAME_STRICT: "false"
+      KC_HTTP_ENABLED: "true"
+      KC_HEALTH_ENABLED: "true"
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://postgres:5432/keycloak
+      KC_DB_USERNAME: ${POSTGRES_USER:-occupi}
+      KC_DB_PASSWORD: ${POSTGRES_PASSWORD:-occupi}
+    volumes:
+      - ./keycloak/realm-occupi.json:/opt/keycloak/data/import/realm-occupi.json:ro
+    command: start-dev --import-realm
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/localhost/9000 && echo -e 'GET /health/ready HTTP/1.0\\r\\n\\r\\n' >&3 && grep -q 'UP' <&3"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
     restart: unless-stopped
 
 volumes:
