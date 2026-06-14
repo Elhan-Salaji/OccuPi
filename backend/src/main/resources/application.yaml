@@ -9,6 +9,14 @@ spring:
   docker:
     compose:
       enabled: false
+  datasource:
+    url: ${POSTGRES_URL:jdbc:postgresql://localhost:5432/occupi}
+    username: ${POSTGRES_USER:occupi}
+    password: ${POSTGRES_PASSWORD:occupi}
+  jpa:
+    hibernate:
+      ddl-auto: update
+    open-in-view: false
 
 influxdb:
   url: http://localhost:8181
