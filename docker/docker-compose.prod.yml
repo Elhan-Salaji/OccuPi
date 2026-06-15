@@ -39,6 +39,9 @@ services:
       KC_HOSTNAME_STRICT: "true"
       # Served under https://<host>/auth — matches the host Nginx /auth route.
       KC_HTTP_RELATIVE_PATH: /auth
+      # Keep the management/health endpoint (port 9000) at root, otherwise /auth
+      # also moves /health/ready and the container healthcheck fails (unhealthy).
+      KC_HTTP_MANAGEMENT_RELATIVE_PATH: "/"
       # Trust X-Forwarded-* from the host Nginx (TLS terminated there).
       KC_PROXY_HEADERS: xforwarded
     # 'start' (not start-dev) for production; auto-builds on first run.
