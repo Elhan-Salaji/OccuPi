@@ -21,13 +21,13 @@ export const Login = () => {
             return;
         }
 
-        const success = await login(username, password);
+        const result = await login(username, password);
 
-        if (success) {
+        if (result.ok) {
             // Login successful -> redirect to dashboard
             navigate('/');
         } else {
-            setError('Ungültiger Username oder Passwort.'); //Test Daten
+            setError(result.error);
         }
     };
 

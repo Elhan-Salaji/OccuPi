@@ -22,6 +22,12 @@ services:
     ports:
       - "127.0.0.1:8080:8080"   # host Nginx → backend
 
+  # Pulled from GHCR (built in CI with the public prod URLs baked in via VITE_*).
+  # Published only to localhost; the host Nginx proxies "/" here.
+  frontend:
+    ports:
+      - "127.0.0.1:3000:80"   # host Nginx → frontend
+
   keycloak:
     environment:
       # Public host of Keycloak (behind the TLS-terminating host Nginx).
@@ -29,6 +35,9 @@ services:
       KC_HOSTNAME_STRICT: "true"
       # Served under https://<host>/auth — matches the host Nginx /auth route.
       KC_HTTP_RELATIVE_PATH: /auth
+      # Keep the management/health endpoint (port 9000) at root, otherwise /auth
+      # also moves /health/ready and the container healthcheck fails (unhealthy).
+      KC_HTTP_MANAGEMENT_RELATIVE_PATH: "/"
       # Trust X-Forwarded-* from the host Nginx (TLS terminated there).
       KC_PROXY_HEADERS: xforwarded
     # 'start' (not start-dev) for production; auto-builds on first run.
