@@ -36,6 +36,20 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
+  # Frontend SPA, served by nginx inside the image. Vite inlines VITE_* at build
+  # time; these defaults target local dev, the prod overlay overrides the URLs.
+  frontend:
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: http://localhost:8080/api
+        VITE_KEYCLOAK_URL: http://localhost:8180
+        VITE_KEYCLOAK_REALM: occupi
+        VITE_KEYCLOAK_CLIENT_ID: occupi-frontend
+    container_name: occupi-frontend
+    restart: unless-stopped
+
   influxdb:
     image: influxdb:3-core
     container_name: occupi-influxdb3

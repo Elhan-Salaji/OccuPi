@@ -16,6 +16,12 @@ services:
     ports:
       - "8080:8080"
 
+  # Built SPA at http://localhost:3000 (an occupi-frontend webOrigin in Keycloak).
+  # For hot-reload development run Vite directly instead (npm run dev → :5173).
+  frontend:
+    ports:
+      - "3000:80"
+
   influxdb:
     ports:
       - "8181:8181"
