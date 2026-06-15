@@ -32,6 +32,7 @@ export const Sidebar = () => {
         {/* button to collapse sidebar */}
         <button
             onClick={() => setIsCollapsed(!isCollapsed)}
+            aria-label={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
             className="absolute -right-3 top-7 bg-[#1F2937] border border-[#374151] text-gray-300 hover:text-white p-1 rounded-md z-10 transition-colors shadow-md"
         >
             {isCollapsed ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />}
