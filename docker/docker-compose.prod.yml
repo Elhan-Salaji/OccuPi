@@ -22,13 +22,9 @@ services:
     ports:
       - "127.0.0.1:8080:8080"   # host Nginx → backend
 
-  # SPA built with the public URLs (Vite inlines them at build time) and published
-  # only to localhost; the host Nginx proxies "/" here.
+  # Pulled from GHCR (built in CI with the public prod URLs baked in via VITE_*).
+  # Published only to localhost; the host Nginx proxies "/" here.
   frontend:
-    build:
-      args:
-        VITE_API_URL: https://${KC_HOSTNAME}/api
-        VITE_KEYCLOAK_URL: https://${KC_HOSTNAME}/auth
     ports:
       - "127.0.0.1:3000:80"   # host Nginx → frontend
 

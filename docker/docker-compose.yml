@@ -14,9 +14,9 @@
 # ─────────────────────────────────────────────────────────────────────────────
 services:
   backend:
-    build:
-      context: ../backend
-      dockerfile: Dockerfile
+    # Prebuilt in CI and pulled from GHCR — the server never builds (see #140).
+    # The local overlay adds a `build:` so development still builds from source.
+    image: ghcr.io/elhan-salaji/occupi-backend:latest
     container_name: occupi-backend
     environment:
       # Internal service-to-service URLs (same in every environment).
@@ -36,17 +36,11 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
-  # Frontend SPA, served by nginx inside the image. Vite inlines VITE_* at build
-  # time; these defaults target local dev, the prod overlay overrides the URLs.
+  # Frontend SPA, served by nginx inside the image. Prebuilt in CI with the PROD
+  # VITE_* URLs (Vite inlines them at build time) and pulled from GHCR. The local
+  # overlay adds a `build:` with localhost URLs so development builds from source.
   frontend:
-    build:
-      context: ../frontend
-      dockerfile: Dockerfile
-      args:
-        VITE_API_URL: http://localhost:8080/api
-        VITE_KEYCLOAK_URL: http://localhost:8180
-        VITE_KEYCLOAK_REALM: occupi
-        VITE_KEYCLOAK_CLIENT_ID: occupi-frontend
+    image: ghcr.io/elhan-salaji/occupi-frontend:latest
     container_name: occupi-frontend
     restart: unless-stopped
 

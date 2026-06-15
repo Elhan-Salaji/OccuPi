@@ -4,12 +4,26 @@ One base + two overlays. The base (`docker-compose.yml`) is never run alone.
 
 ```
 docker-compose.yml           # base: shared services + internal network (no host ports)
-docker-compose.override.yml  # LOCAL: dev profile, all ports on host, Keycloak start-dev
+docker-compose.override.yml  # LOCAL: dev profile, all ports on host, Keycloak start-dev, builds from source
 docker-compose.prod.yml      # SERVER: prod profile, 127.0.0.1-only ports, Keycloak hardened
 .env / .env.example          # secrets & host config (.env is git-ignored)
 keycloak/realm-occupi.json   # realm import (clients, HdM-LDAP federation, roles)
 postgres/init/               # creates the 'keycloak' database on first start
 ```
+
+## Images: built in CI, pulled in prod
+
+The `backend` and `frontend` services reference prebuilt GHCR images in the base:
+`ghcr.io/elhan-salaji/occupi-{backend,frontend}:latest`. They are built and pushed by
+the [`Build & Push Images`](../.github/workflows/images.yml) workflow on every push to
+`develop`. The **production server only pulls** these images and never builds — an
+on-server Maven build once exhausted the swapless VM's RAM (memory livelock, see #140).
+
+- The **frontend** image is built in CI with the **prod** `VITE_*` URLs baked in (Vite
+  inlines them at build time), so it points at `https://occupi.mi.hdm-stuttgart.de`.
+- The GHCR packages are **public**, so the server pulls without authentication.
+- **Local development** still builds from source: the local overlay adds a `build:` for
+  both services (frontend with `localhost` URLs).
 
 ## Local
 
@@ -17,10 +31,13 @@ postgres/init/               # creates the 'keycloak' database on first start
 
 ```bash
 cd docker
-docker compose up -d                 # full stack (builds the backend image)
+docker compose up -d --build         # full stack (builds backend & frontend from source)
 docker compose up -d influxdb postgres keycloak   # infra only (run backend via ./mvnw)
 docker compose down                  # stop (add -v to also drop data volumes)
 ```
+
+Use `--build` to pick up source changes — without it Compose reuses the local image
+(which may be a previously pulled GHCR `:latest`).
 
 Exposed locally: backend `:8080`, Keycloak `:8180`, InfluxDB `:8181`, Postgres `:5432`.
 Backend runs in the open **dev** profile (no auth). To test auth locally:
@@ -31,6 +48,7 @@ Backend runs in the open **dev** profile (no auth). To test auth locally:
 ```bash
 cd docker
 cp .env.example .env        # then set real POSTGRES_PASSWORD, KEYCLOAK_ADMIN_PASSWORD, KC_HOSTNAME
+docker compose -f docker-compose.yml -f docker-compose.prod.yml pull   # pull prebuilt images (never builds)
 docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
 docker compose -f docker-compose.yml -f docker-compose.prod.yml ps
 ```
