@@ -30,7 +30,8 @@ export default function Dashboard() {
                         };
                 });
 
-                setRooms(combined); //schreibt die kombinierten Daten in den Store
+                // Solange noch keine echten Räume in der DB sind, Mock-Daten anzeigen
+                setRooms(combined.length > 0 ? combined : MOCK_ROOMS);
             } catch (error) {
                 console.error("Fehler beim Laden:", error);
                 setRooms(MOCK_ROOMS);
