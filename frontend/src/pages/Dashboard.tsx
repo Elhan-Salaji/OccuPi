@@ -3,7 +3,7 @@ import { useRoomStore } from '../hooks/useRoomStore';
 import { MOCK_ROOMS } from '../utils/mockData';
 import { Users, Activity } from 'lucide-react';
 import api from '../utils/api';
-import type { Room } from '../types/room'; //no function anymore
+import type { Room, RoomResponse, Occupancy } from '../types/room';
 
 export default function Dashboard() {
     // Wir holen uns die Räume und die Funktion zum Setzen aus dem Store
@@ -12,8 +12,25 @@ export default function Dashboard() {
     useEffect(() => {
         const fetchRooms = async () => {
             try {
-                const response = await api.get<Room[]>('/rooms');
-                setRooms(response.data);
+                const [roomsRes, occupancyRes] = await Promise.all([
+                    api.get<RoomResponse[]>('/rooms'),
+                    api.get<Occupancy[]>('/api/occupancy/all')
+                ]);
+
+                const combined: Room[] = roomsRes.data.map((room) => {
+                    const occ = occupancyRes.data.find((o) => o.roomId === room.roomId);
+                    const ratio = (occ?.count ?? 0) / room.capacity;
+                    const status = ratio < 0.5 ? 'low' : ratio < 0.8 ? 'medium' : 'high';
+                        return {
+                            ...room,
+                            count: occ?.count ?? 0,
+                            confidence: occ?.confidence ?? 0,
+                            timestamp: occ?.timestamp ?? '',
+                            status,
+                        };
+                });
+
+                setRooms(combined); //schreibt die kombinierten Daten in den Store
             } catch (error) {
                 console.error("Fehler beim Laden:", error);
                 setRooms(MOCK_ROOMS);
@@ -33,7 +50,7 @@ export default function Dashboard() {
             {/* Das Grid für die Raum-Karten */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {rooms.map((room) => (
-                    <div key={room.id} className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 hover:shadow-md transition-shadow">
+                    <div key={room.roomId} className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 hover:shadow-md transition-shadow">
                         <div className="flex justify-between items-start mb-4">
                             <div>
                                 <h3 className="font-bold text-lg text-gray-800">{room.name}</h3>
@@ -49,8 +66,8 @@ export default function Dashboard() {
                         <div className="flex items-center justify-between">
                             <div className="flex items-center space-x-2 text-gray-600">
                                 <Users size={20} />
-                                <span className="text-2xl font-semibold">{room.currentOccupancy}</span>
-                                <span className="text-gray-400">/ {room.maxCapacity}</span>
+                                <span className="text-2xl font-semibold">{room.count}</span>
+                                <span className="text-gray-400">/ {room.capacity}</span>
                             </div>
                             <Activity size={20} className="text-blue-500 opacity-20" />
                         </div>
@@ -62,7 +79,7 @@ export default function Dashboard() {
                                     room.status === 'low' ? 'bg-green-500' :
                                         room.status === 'medium' ? 'bg-yellow-500' : 'bg-red-500'
                                 }`}
-                                style={{ width: `${(room.currentOccupancy / room.maxCapacity) * 100}%` }}
+                                style={{ width: `${(room.count / room.capacity) * 100}%` }}
                             />
                         </div>
                     </div>
