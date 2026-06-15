@@ -6,7 +6,7 @@ import Rooms from './pages/Rooms';
 import Analytics from './pages/Analytics';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { useAuthStore } from './hooks/useAuthStore';
-import { MainLayout } from './components/MainLayout';
+import { MainLayout } from './layouts/MainLayout.tsx';
 
 function App() {
     const initializeAuth = useAuthStore((state) => state.initializeAuth);
