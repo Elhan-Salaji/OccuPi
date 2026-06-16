@@ -1,0 +1,5 @@
+# Keep shell scripts and systemd units LF-only so they work when checked out on
+# the Linux server (the repo is also edited on Windows where core.autocrlf=true).
+*.sh       text eol=lf
+*.service  text eol=lf
+*.timer    text eol=lf
