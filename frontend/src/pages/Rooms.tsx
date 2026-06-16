@@ -63,8 +63,8 @@ export default function Rooms(){
 
         <div className="max-w-7xl mx-auto">
             <header className="mb-8">
-                <h1 className="text-3xl text-left px-4 py-2 font-bold text-blue-900">Raumübersicht</h1> {/*not styled to the usual norm of dashboard.tsx -> "text-left px-4 py-2 | delete by chance"*/}
-                <p className="text-left px-4 text-gray-500">Alle Räume mit aktueller Belegung</p> {/*not styled to the usual norm of dashboard.tsx -> "text-left px-4" | delete by chance*/}
+                <h1 className="text-3xl text-left font-bold text-gray-900">Raumübersicht</h1>
+                <p className="text-left text-gray-500">Alle Räume mit aktueller Belegung</p>
             </header>
         <div className="overflow-x-auto">
             <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
