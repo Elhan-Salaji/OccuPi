@@ -1,0 +1,15 @@
+# Runs occupi-autodeploy.service periodically. Install: see deploy/README.md.
+[Unit]
+Description=Run OccuPi auto-deploy every 5 minutes
+
+[Timer]
+# First run 2 min after boot, then every 5 min after each run finishes.
+OnBootSec=2min
+OnUnitActiveSec=5min
+# Spread the wakeup a little so it never fires on the exact same second.
+RandomizedDelaySec=30
+# Catch up on a run that was missed while the machine was off.
+Persistent=true
+
+[Install]
+WantedBy=timers.target

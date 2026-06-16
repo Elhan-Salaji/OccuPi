@@ -1,0 +1,15 @@
+# OccuPi auto-deploy — one-shot unit run on a timer (see occupi-autodeploy.timer).
+# Pulls the latest GHCR images and applies them with health-gated rollback.
+# Install: see deploy/README.md.
+[Unit]
+Description=OccuPi auto-deploy (pull latest images, health-gated)
+Wants=network-online.target docker.service
+After=network-online.target docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+# Run via bash explicitly so it does not depend on the file's executable bit
+# (the repo is also edited on Windows). The script itself uses the prod overlay.
+ExecStart=/bin/bash /home/Elhan/Occupi/deploy/auto-deploy.sh
+TimeoutStartSec=900
