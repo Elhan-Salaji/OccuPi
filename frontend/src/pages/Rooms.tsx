@@ -7,12 +7,12 @@ const columns: { label: string; render: (r: Room) => React.ReactNode }[] = [
     {label: 'Gebäude', render: (r) => r.building},
     {label: 'Etage', render: (r) => String(r.floor) },
     {label: 'Belegung', render: (r) => <OccupancyBar count={r.count} capacity={r.capacity} /> },
-    {label: 'Auslastung', render: (r) => <StatusBadge status={r.status}/> },
+    {label: 'Auslastung', render: (r) => <StatusBadge status={r.occupancyRate}/> },
     {label: 'Aktualisiert', render: (r) => formatTime(r.timestamp) },
 
 ];
 
-function StatusBadge({ status }: { status: Room['status'] }) {
+function StatusBadge({ status }: { status: Room['occupancyRate'] }) {
     const styles = {
         low:    'bg-green-100 text-green-800',
         medium: 'bg-yellow-100 text-yellow-800',
@@ -63,10 +63,10 @@ export default function Rooms(){
 
         <div className="max-w-7xl mx-auto">
             <header className="mb-8">
-                <h1 className="text-3xl text-left px-4 py-2 font-bold text-blue-900">Raumübersicht</h1> {/*not styled to the usual norm -> "text-left px-4 py-2 | delete by chance"*/}
-                <p className="text-left px-4 text-gray-500">Alle Räume mit aktueller Belegung</p> {/*not styled to the usual norm -> "text-left px-4" | delete by chance*/}
+                <h1 className="text-3xl text-left px-4 py-2 font-bold text-blue-900">Raumübersicht</h1> {/*not styled to the usual norm of dashboard.tsx -> "text-left px-4 py-2 | delete by chance"*/}
+                <p className="text-left px-4 text-gray-500">Alle Räume mit aktueller Belegung</p> {/*not styled to the usual norm of dashboard.tsx -> "text-left px-4" | delete by chance*/}
             </header>
-
+        <div className="overflow-x-auto">
             <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
                 <table className="w-full">
                     <thead>
@@ -92,7 +92,7 @@ export default function Rooms(){
                     </tbody>
                 </table>
             </div>
-
+        </div>
         </div>
 
     );

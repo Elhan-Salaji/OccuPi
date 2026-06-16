@@ -14,7 +14,7 @@ export const MOCK_ROOMS: Room[] = [
         count: 49,
         confidence: 0.85,
         capacity: 50,
-        status: 'high',
+        occupancyRate: 'high',
         timestamp: new Date().toISOString(),
     },
     {
@@ -25,7 +25,7 @@ export const MOCK_ROOMS: Room[] = [
         count: 6,
         confidence: 1,
         capacity: 20,
-        status: 'low',
+        occupancyRate: 'low',
         timestamp: new Date().toISOString(),
     },
     {
@@ -36,7 +36,7 @@ export const MOCK_ROOMS: Room[] = [
         count: 110,
         confidence: 0.5,
         capacity: 250,
-        status: 'medium',
+        occupancyRate: 'medium',
         timestamp: new Date().toISOString(),
     }
 ];

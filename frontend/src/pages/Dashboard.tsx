@@ -20,13 +20,13 @@ export default function Dashboard() {
                 const combined: Room[] = roomsRes.data.map((room) => {
                     const occ = occupancyRes.data.find((o) => o.roomId === room.roomId);
                     const ratio = (occ?.count ?? 0) / room.capacity;
-                    const status = ratio < 0.5 ? 'low' : ratio < 0.8 ? 'medium' : 'high';
+                    const occupancyRate = ratio < 0.5 ? 'low' : ratio < 0.8 ? 'medium' : 'high';
                         return {
                             ...room,
                             count: occ?.count ?? 0,
                             confidence: occ?.confidence ?? 0,
                             timestamp: occ?.timestamp ?? '',
-                            status,
+                            occupancyRate,
                         };
                 });
 
@@ -59,8 +59,8 @@ export default function Dashboard() {
                             </div>
                             {/* traffic light system */}
                             <div className={`w-3 h-3 rounded-full ${
-                                room.status === 'low' ? 'bg-green-500' :
-                                    room.status === 'medium' ? 'bg-yellow-500' : 'bg-red-500'
+                                room.occupancyRate === 'low' ? 'bg-green-500' :
+                                    room.occupancyRate === 'medium' ? 'bg-yellow-500' : 'bg-red-500'
                             }`} />
                         </div>
 
@@ -77,8 +77,8 @@ export default function Dashboard() {
                         <div className="mt-4 w-full bg-gray-100 rounded-full h-2">
                             <div
                                 className={`h-2 rounded-full transition-all duration-500 ${
-                                    room.status === 'low' ? 'bg-green-500' :
-                                        room.status === 'medium' ? 'bg-yellow-500' : 'bg-red-500'
+                                    room.occupancyRate === 'low' ? 'bg-green-500' :
+                                        room.occupancyRate === 'medium' ? 'bg-yellow-500' : 'bg-red-500'
                                 }`}
                                 style={{ width: `${(room.count / room.capacity) * 100}%` }}
                             />
