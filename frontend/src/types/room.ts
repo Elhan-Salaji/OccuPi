@@ -23,7 +23,7 @@ export interface Room {
     count: number; // How many people are in the room?
     confidence: number;
     timestamp: string; //
-    status: 'low' | 'medium' | 'high'; // status
+    occupancyRate: 'low' | 'medium' | 'high'; // status
 }
 
 export interface RoomResponse {
