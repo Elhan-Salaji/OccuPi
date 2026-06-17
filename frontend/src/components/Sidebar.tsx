@@ -24,6 +24,9 @@ export const Sidebar = () => {
         { path: '/analytics', label: 'Analytics', icon: ChartColumn },
     ];
 
+    //switch for the pop-up (default: false = closed)
+    const [showLogoutDialog, setShowLogoutDialog] = useState(false);
+
     return (
     <aside className={`relative z-20 bg-[#111827] text-gray-300 flex flex-col justify-between border-r border-[#1F2937] transition-all duration-300 ease-in-out ${isCollapsed ? 'w-20' : 'w-64'}`}>
         {/* background dark blue / test - with dynamic width*/}
@@ -80,6 +83,7 @@ export const Sidebar = () => {
         {/* lower section */}
         <div className="p-4 border-t border-[#1F2937]">
             <button
+                onClick={() => setShowLogoutDialog(true)}
                 title={isCollapsed ? 'Logout' : undefined}
                 className={`flex items-center rounded-xl font-medium transition-all duration-200 hover:bg-red-500/20 text-gray-400 hover:text-red-300 ${
                     isCollapsed
@@ -88,9 +92,37 @@ export const Sidebar = () => {
                 }`}
             >
                 <LogOut size={22} className="shrink-0" />
-                {!isCollapsed && <span className="ml-4 truncate">Logout</span>}
+                {!isCollapsed && <span className="ml-4 truncate">Log out</span>}
             </button>
+            {showLogoutDialog && (
+                <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center">
+                    {/* Die weiße Box */}
+                    <div className="bg-white rounded-xl shadow-2xl p-6 max-w-sm w-full mx-4">
+                        <h2 className="text-xl font-bold text-gray-900 mb-2">Log out</h2>
+                        <p className="text-gray-500 mb-6">Do you really want to log out of the system?</p>
+
+                        <div className="flex justify-end space-x-3">
+                            <button
+                                onClick={() => setShowLogoutDialog(false)}
+                                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={() => {
+                                    console.log("TODO for later: Logout-Logik with Keycloak");
+                                    setShowLogoutDialog(false);
+                                }}
+                                className="px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors"
+                            >
+                                Log out
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     </aside>
 );
 };
+
