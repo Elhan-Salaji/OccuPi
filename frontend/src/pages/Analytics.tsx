@@ -2,6 +2,15 @@ import { useRoomStore } from '../hooks/useRoomStore';
 import { StatusBadge} from '../components/RoomStatus';
 import {useState} from "react";
 
+function SummaryCard({ label, value }: {label: string; value: string | number }) {
+    return (
+        <div className="bg-white rounded-2xl border border-gray-100 p-4">
+            <p className="text-sm text-gray-400 mb-1">{label}</p>
+            <p className="text-2xl font-semibold text-gray-900">{value}</p>
+        </div>
+    );
+
+}
 
 export default function Analytics() {
     const { rooms } = useRoomStore();
@@ -34,16 +43,6 @@ export default function Analytics() {
     const occupancyPct = totalCapacity > 0 ? Math.round((totalPeople / totalCapacity) * 100) : 0;
 
     const columns = ['Raum', 'Gebäude', 'Belegung', 'Auslastung'];
-
-    function SummaryCard({ label, value }: {label: string; value: string | number }) {
-        return (
-            <div className="bg-white rounded-2xl border border-gray-100 p-4">
-                <p className="text-sm text-gray-400 mb-1">{label}</p>
-                <p className="text-2xl font-semibold text-gray-900">{value}</p>
-            </div>
-        );
-
-    }
 
     return (
         <div className="max-w-7xl mx-auto">
