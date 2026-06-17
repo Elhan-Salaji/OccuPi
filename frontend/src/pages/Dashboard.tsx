@@ -13,7 +13,7 @@ export default function Dashboard() {
         const fetchRooms = async () => {
             try {
                 const [roomsRes, occupancyRes] = await Promise.all([
-                    api.get<RoomResponse[]>('/rooms'),
+                    api.get<RoomResponse[]>('/api/rooms'),
                     api.get<Occupancy[]>('/api/occupancy/all')
                 ]);
 
@@ -30,7 +30,7 @@ export default function Dashboard() {
                         };
                 });
 
-                // Solange noch keine echten Räume in der DB sind, Mock-Daten anzeigen
+                // as long as there are no room data in the DB, show / use mock data
                 setRooms(combined.length > 0 ? combined : MOCK_ROOMS);
             } catch (error) {
                 console.error("Fehler beim Laden:", error);
