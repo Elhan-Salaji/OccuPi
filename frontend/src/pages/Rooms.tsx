@@ -8,7 +8,7 @@ const columns: { label: string; render: (r: Room) => React.ReactNode }[] = [
     {label: 'Gebäude', render: (r) => r.building},
     {label: 'Etage', render: (r) => String(r.floor) },
     {label: 'Belegung', render: (r) => <OccupancyBar count={r.count} capacity={r.capacity} /> },
-    {label: 'Auslastung', render: (r) => <StatusBadge status={r.occupancyRate}/> },
+    {label: 'Auslastung', render: (r) => <StatusBadge occupancyRate={r.occupancyRate}/> },
     {label: 'Aktualisiert', render: (r) => formatTime(r.timestamp) },
 
 ];
