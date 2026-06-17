@@ -1,10 +1,33 @@
 import { useRoomStore } from '../hooks/useRoomStore';
 import { StatusBadge} from '../components/RoomStatus';
+import {useState} from "react";
 
 
 export default function Analytics() {
     const { rooms } = useRoomStore();
 
+    // Filter & sort state
+    const [search, setSearch] = useState('');
+    const [buildingFilter, setBuildingFilter] = useState('');
+    const [statusFilter, setStatusFilter] = useState('');
+    const [sortBy, setSortBy] = useState('');
+
+    //Filtered & sorted room list
+    const filteredRooms = rooms
+            .filter((r) => r.name.toLowerCase().includes(search.toLowerCase()))
+            .filter((r) => buildingFilter === '' || r.building === buildingFilter)
+            .filter((r) => statusFilter === '' || r.occupancyRate === statusFilter)
+        .sort((a, b) => {
+            if (sortBy === 'least') return a.count / a.capacity - b.count / b.capacity;
+            if (sortBy === 'most') return b.count / b.capacity - a.count / a.capacity;
+            if (sortBy === 'building') return a.building.localeCompare(b.building);
+            return 0;
+        });
+
+    //Unique buildings for dropdown
+    const buildings = [...new Set(rooms.map((r) => r.building))];
+
+    //Summary card values
     const totalRooms = rooms.length;
     const totalCapacity = rooms.reduce((sum, r) => sum + r.capacity, 0);
     const totalPeople = rooms.reduce((sum, r) => sum + r.count, 0);
@@ -35,19 +58,63 @@ export default function Analytics() {
                 <SummaryCard label="Auslastung" value={`${occupancyPct}%`}/>
             </div>
 
+            <div className="flex flex-wrap gap-3 mb-4">
+
+                {/* Search input */}
+                <input type="text" placeholder="Suche..." value={search} onChange={(e) => setSearch(e.target.value)}
+                       className="bg-white w-full md:w-72 px-4 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-100"/>
+
+                {/* Building filter */}
+                <select
+                    value={buildingFilter}
+                    onChange={(e) => setBuildingFilter(e.target.value)}
+                    className="bg-white px-4 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-100">
+
+                    <option value="">Alle Gebäude</option>
+                    {buildings.map((b) => (
+                        <option key={b} value={b}>{b}</option>
+                    ))}
+                </select>
+
+                {/* Status filter */}
+                <select
+                    value={statusFilter}
+                    onChange={(e) => setStatusFilter(e.target.value)}
+                    className="bg-white px-4 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-100">
+
+                    <option value="">Alle Status</option>
+                    <option value="low">Niedrig</option>
+                    <option value="medium">Mittel</option>
+                    <option value="high">Hoch</option>
+                </select>
+
+                {/* Sort */}
+                <select
+                    value={sortBy}
+                    onChange={(e) => setSortBy(e.target.value)}
+                    className="bg-white px-4 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-100"
+                >
+                    <option value="">Sortierung</option>
+                    <option value="least">Aktuell am leersten</option>
+                    <option value="most">Aktuell am vollsten</option>
+                    <option value="building">Nach Gebäude</option>
+                </select>
+
+            </div>
+
             <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
                 <table className="w-full">
                     <thead>
                     <tr className="border-b border-gray-100">
-                            {columns.map((col) => (
-                                <th key={col} className="text-left px-4 py-3 text-sm font-medium text-gray-600">
-                                    {col}
+                        {columns.map((col) => (
+                            <th key={col} className="text-left px-4 py-3 text-sm font-medium text-gray-600">
+                            {col}
                             </th>
-                         ))}
-                        </tr>
+                        ))}
+                    </tr>
                     </thead>
                     <tbody>
-                    {rooms.map((room) => (
+                    {filteredRooms.map((room) => (
                         <tr key={room.roomId} className="border-b border-gray-100 hover:bg-gray-50">
                             <td className="px-4 py-3 text-sm font-medium text-gray-900">
                                 {room.name}
