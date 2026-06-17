@@ -25,7 +25,7 @@ export const Sidebar = () => {
     ];
 
     return (
-    <aside className={`relative bg-[#111827] text-gray-300 flex flex-col justify-between border-r border-[#1F2937] transition-all duration-300 ease-in-out ${isCollapsed ? 'w-20' : 'w-64'}`}>
+    <aside className={`relative z-20 bg-[#111827] text-gray-300 flex flex-col justify-between border-r border-[#1F2937] transition-all duration-300 ease-in-out ${isCollapsed ? 'w-20' : 'w-64'}`}>
         {/* background dark blue / test - with dynamic width*/}
 
 
