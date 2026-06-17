@@ -96,7 +96,7 @@ export const Sidebar = () => {
             </button>
             {showLogoutDialog && (
                 <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center">
-                    {/* Die weiße Box */}
+                    {/* White Box */}
                     <div className="bg-white rounded-xl shadow-2xl p-6 max-w-sm w-full mx-4">
                         <h2 className="text-xl font-bold text-gray-900 mb-2">Log out</h2>
                         <p className="text-gray-500 mb-6">Do you really want to log out of the system?</p>
