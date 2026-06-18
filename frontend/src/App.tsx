@@ -1,21 +1,14 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { useEffect } from 'react';
 import Dashboard from './pages/Dashboard';
 import { Login } from './pages/Login';
 import Rooms from './pages/Rooms';
 import Analytics from './pages/Analytics';
 import { ProtectedRoute } from './components/ProtectedRoute';
-import { useAuthStore } from './hooks/useAuthStore';
 import { MainLayout } from './layouts/MainLayout.tsx';
 
 function App() {
-    const initializeAuth = useAuthStore((state) => state.initializeAuth);
-
-    // fix: perform initialization cleanly on app mount
-    useEffect(() => {
-        initializeAuth();
-    }, [initializeAuth]);
-
+    // Auth state is restored synchronously when the store is created
+    // (see useAuthStore → loadInitialAuth), so no init effect is needed here.
     return (
         <Router>
             <Routes>
