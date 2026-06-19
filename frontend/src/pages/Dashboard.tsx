@@ -1,45 +1,12 @@
-import { useEffect } from 'react';
 import { useRoomStore } from '../hooks/useRoomStore';
-import { MOCK_ROOMS } from '../utils/mockData';
 import { Users, Activity } from 'lucide-react';
-import api from '../utils/api';
-import type { Room, RoomResponse, Occupancy } from '../types/room';
+import { useFetchRooms } from '../hooks/useFetchRooms';
 
 export default function Dashboard() {
     // we retrieve spaces and function for setting them from the sore
-    const { rooms, setRooms, isConnected } = useRoomStore();
+    const { rooms, isConnected } = useRoomStore();
 
-    useEffect(() => {
-        const fetchRooms = async () => {
-            try {
-                const [roomsRes, occupancyRes] = await Promise.all([
-                    api.get<RoomResponse[]>('/rooms'),
-                    api.get<Occupancy[]>('/occupancy/all')
-                ]);
-
-                const combined: Room[] = roomsRes.data.map((room) => {
-                    const occ = occupancyRes.data.find((o) => o.roomId === room.roomId);
-                    const ratio = (occ?.count ?? 0) / room.capacity;
-                    const occupancyRate = ratio < 0.5 ? 'low' : ratio < 0.8 ? 'medium' : 'high';
-                        return {
-                            ...room,
-                            count: occ?.count ?? 0,
-                            confidence: occ?.confidence ?? 0,
-                            timestamp: occ?.timestamp ?? '',
-                            occupancyRate,
-                        };
-                });
-
-                // as long as there are no room data in the DB, show / use mock data
-                setRooms(combined.length > 0 ? combined : MOCK_ROOMS);
-            } catch (error) {
-                console.error("Fehler beim Laden:", error);
-                setRooms(MOCK_ROOMS);
-            }
-        };
-
-        fetchRooms();
-    }, [setRooms]);
+    useFetchRooms();
 
     return (
         <div className="max-w-7xl mx-auto">

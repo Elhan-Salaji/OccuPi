@@ -1,5 +1,6 @@
 import { useRoomStore } from '../hooks/useRoomStore.ts';
 import { StatusBadge, OccupancyBar } from '../components/RoomStatus.tsx';
+import { useFetchRooms } from '../hooks/useFetchRooms';
 import type { Room } from '../types/room';
 import React from 'react';
 
@@ -23,6 +24,8 @@ function formatTime(timestamp: string) {
 
 export default function Rooms(){
     const { rooms } = useRoomStore();
+
+    useFetchRooms();
 
     return (
 

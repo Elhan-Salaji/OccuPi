@@ -1,6 +1,7 @@
 import { useRoomStore } from '../hooks/useRoomStore';
 import { StatusBadge} from '../components/RoomStatus';
 import {useState} from "react";
+import { useFetchRooms } from '../hooks/useFetchRooms';
 
 function SummaryCard({ label, value }: {label: string; value: string | number }) {
     return (
@@ -14,7 +15,7 @@ function SummaryCard({ label, value }: {label: string; value: string | number })
 
 export default function Analytics() {
     const { rooms } = useRoomStore();
-
+    useFetchRooms();
     // Filter & sort state
     const [search, setSearch] = useState('');
     const [buildingFilter, setBuildingFilter] = useState('');
