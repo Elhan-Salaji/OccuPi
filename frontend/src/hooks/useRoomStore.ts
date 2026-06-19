@@ -6,6 +6,8 @@ interface RoomState {
     rooms: Room[];
     setRooms: (rooms: Room[]) => void;
     updateRoom: (roomId: string, count: number) => void;
+    isConnected: boolean;
+    setIsConnected: (value: boolean) => void;
 }
 
 export const useRoomStore = create<RoomState>((set) => ({
@@ -23,4 +25,8 @@ export const useRoomStore = create<RoomState>((set) => ({
             return { ...room, count, occupancyRate };
         }),
     })),
+
+    isConnected: false,
+    setIsConnected: (value) => set({ isConnected: value}),
+
 }));

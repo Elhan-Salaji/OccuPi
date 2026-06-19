@@ -1,6 +1,5 @@
 import { useEffect } from 'react';
 import { useRoomStore } from '../hooks/useRoomStore';
-import { useWebSocket} from "../hooks/useWebSocket";
 import { MOCK_ROOMS } from '../utils/mockData';
 import { Users, Activity } from 'lucide-react';
 import api from '../utils/api';
@@ -8,15 +7,14 @@ import type { Room, RoomResponse, Occupancy } from '../types/room';
 
 export default function Dashboard() {
     // we retrieve spaces and function for setting them from the sore
-    const { rooms, setRooms } = useRoomStore();
-    const { isConnected } = useWebSocket();
+    const { rooms, setRooms, isConnected } = useRoomStore();
 
     useEffect(() => {
         const fetchRooms = async () => {
             try {
                 const [roomsRes, occupancyRes] = await Promise.all([
-                    api.get<RoomResponse[]>('/api/rooms'),
-                    api.get<Occupancy[]>('/api/occupancy/all')
+                    api.get<RoomResponse[]>('/rooms'),
+                    api.get<Occupancy[]>('/occupancy/all')
                 ]);
 
                 const combined: Room[] = roomsRes.data.map((room) => {
