@@ -30,5 +30,5 @@ export function useWebSocket() {
         return () => {
             client.deactivate();
         };
-    }, [updateRoom]);
+    }, [updateRoom, setIsConnected]);
 }
