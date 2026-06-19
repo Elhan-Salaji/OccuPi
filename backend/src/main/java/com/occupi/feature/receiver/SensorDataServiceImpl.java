@@ -5,6 +5,7 @@ import com.occupi.feature.database.service.OccupancyService;
 import com.occupi.feature.receiver.dto.SensorData;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 
 /**
@@ -27,6 +28,7 @@ import org.springframework.stereotype.Service;
 public class SensorDataServiceImpl implements SensorDataService {
 
     private final OccupancyService occupancyService;
+    private final SimpMessagingTemplate messagingTemplate;
 
     /**
      * Processes incoming sensor data by mapping it to an occupancy record
@@ -48,6 +50,8 @@ public class SensorDataServiceImpl implements SensorDataService {
 
             // Delegate persistence to the database layer
             occupancyService.recordOccupancy(occupancyData);
+
+            messagingTemplate.convertAndSend("/topic/occupancy", data);
 
             log.debug("Successfully processed sensor data: room={}, sensor={}, count={}",
                     data.roomId(), data.sensorId(), data.count());
