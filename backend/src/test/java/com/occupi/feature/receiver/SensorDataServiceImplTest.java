@@ -8,15 +8,17 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 
 import java.time.Instant;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.*;
 
 /**
  * Unit tests for {@link SensorDataServiceImpl}.
@@ -31,11 +33,14 @@ class SensorDataServiceImplTest {
     @Mock
     private OccupancyService occupancyService;
 
+    @Mock
+    private SimpMessagingTemplate messagingTemplate;
+
     private SensorDataServiceImpl sensorDataService;
 
     @BeforeEach
     void setUp() {
-        sensorDataService = new SensorDataServiceImpl(occupancyService);
+        sensorDataService = new SensorDataServiceImpl(occupancyService, messagingTemplate);
     }
 
     @Test
@@ -92,7 +97,7 @@ class SensorDataServiceImplTest {
         sensorDataService.process(sensorData);
 
         // Assert
-        verify(occupancyService).recordOccupancy(org.mockito.ArgumentMatchers.any(OccupancyData.class));
+        verify(occupancyService).recordOccupancy(any(OccupancyData.class));
     }
 
     @Test
@@ -102,7 +107,7 @@ class SensorDataServiceImplTest {
         sensorDataService.process(null);
 
         // Assert
-        verify(occupancyService, never()).recordOccupancy(org.mockito.ArgumentMatchers.any());
+        verify(occupancyService, never()).recordOccupancy(any());
     }
 
     @Test
@@ -117,7 +122,7 @@ class SensorDataServiceImplTest {
                 Instant.now()
         );
         org.mockito.Mockito.doThrow(new RuntimeException("Database connection failed"))
-                .when(occupancyService).recordOccupancy(org.mockito.ArgumentMatchers.any());
+                .when(occupancyService).recordOccupancy(any());
 
         // Act & Assert
         assertThatThrownBy(() -> sensorDataService.process(sensorData))
@@ -218,6 +223,18 @@ class SensorDataServiceImplTest {
 
         // Assert
         verify(occupancyService, org.mockito.Mockito.times(2))
-                .recordOccupancy(org.mockito.ArgumentMatchers.any());
+                .recordOccupancy(any());
+    }
+
+    @Test
+    @DisplayName("Should broadcast sensor data to /topic/occupancy after persistence")
+    void testBroadcastAfterPersistence() {
+        SensorData data = new SensorData("room-101", "sensor-A", 5, 0.95, Instant.now());
+
+        sensorDataService.process(data);
+
+        InOrder inOrder = inOrder(occupancyService, messagingTemplate);
+        inOrder.verify(occupancyService).recordOccupancy(any(OccupancyData.class));
+        inOrder.verify(messagingTemplate).convertAndSend("/topic/occupancy", data);
     }
 }
