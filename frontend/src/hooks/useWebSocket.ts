@@ -1,16 +1,15 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import { Client } from '@stomp/stompjs';
 import SockJS from 'sockjs-client';
 import { useRoomStore } from './useRoomStore';
 import type { Occupancy } from '../types/room';
 
 export function useWebSocket() {
-    const [isConnected, setIsConnected] = useState(false);
-    const { updateRoom } = useRoomStore();
+    const { updateRoom, setIsConnected } = useRoomStore();
     const clientRef = useRef<Client | null>(null);
 
     useEffect(() => {
-        const wsUrl = import.meta.env.VITE_API_URL.replace(/\/api$/, '') + '/ws';
+        const wsUrl = import.meta.env.VITE_API_URL.replace(/\/api$/, '') + '/ws/occupancy';
 
         const client = new Client({
             webSocketFactory: () => new SockJS(wsUrl),
@@ -32,5 +31,4 @@ export function useWebSocket() {
             client.deactivate();
         };
     }, [updateRoom]);
-    return { isConnected };
 }
