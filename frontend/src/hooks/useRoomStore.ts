@@ -16,8 +16,11 @@ export const useRoomStore = create<RoomState>((set) => ({
 
     // Funktion, um nur die Belegung eines einzelnen Raums zu ändern
     updateRoom: (roomId, count) => set((state) => ({
-        rooms: state.rooms.map((room) =>
-            room.roomId === roomId ? { ...room, count } : room
-        ),
+        rooms: state.rooms.map((room) => {
+            if (room.roomId !== roomId) return room;
+            const ratio = count / room.capacity;
+            const occupancyRate = ratio < 0.5 ? 'low' : ratio < 0.8 ? 'medium' : 'high';
+            return { ...room, count, occupancyRate };
+        }),
     })),
 }));

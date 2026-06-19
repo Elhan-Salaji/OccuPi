@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { useRoomStore } from '../hooks/useRoomStore';
+import { useWebSocket} from "../hooks/useWebSocket";
 import { MOCK_ROOMS } from '../utils/mockData';
 import { Users, Activity } from 'lucide-react';
 import api from '../utils/api';
@@ -8,6 +9,7 @@ import type { Room, RoomResponse, Occupancy } from '../types/room';
 export default function Dashboard() {
     // we retrieve spaces and function for setting them from the sore
     const { rooms, setRooms } = useRoomStore();
+    const { isConnected } = useWebSocket();
 
     useEffect(() => {
         const fetchRooms = async () => {
@@ -43,9 +45,17 @@ export default function Dashboard() {
 
     return (
         <div className="max-w-7xl mx-auto">
-            <header className="mb-8">
-                <h1 className="text-3xl font-bold text-gray-900">Live-Belegung</h1>
-                <p className="text-gray-500">Echtzeit-Daten der mmWave-Sensoren (HdM Campus)</p>
+            <header className="mb-8 flex justify-between items-start">
+                <div>
+                    <h1 className="text-3xl font-bold text-gray-900">Live-Belegung</h1>
+                    <p className="text-gray-500">Echtzeit-Daten der mmWave-Sensoren (HdM Campus)</p>
+                </div>
+                <div className="flex items-center gap-2 text-sm">
+                    <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-gray-400'}`} />
+                    <span className={isConnected ? 'text-green-600' : 'text-gray-400'}>
+                        {isConnected ? 'Live' : 'Verbinde...'}
+                    </span>
+                </div>
             </header>
 
             {/* grid for rooms */}
