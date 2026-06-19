@@ -39,6 +39,8 @@ export default function Dashboard() {
         };
 
         fetchRooms();
+        const interval = setInterval(fetchRooms, 10000);
+        return () => clearInterval(interval);
     }, [setRooms]);
 
     return (
