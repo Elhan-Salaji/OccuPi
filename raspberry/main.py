@@ -14,7 +14,7 @@ from config import (
     QUEUE_MAX_SIZE,
     WS_RECONNECT_DELAY, WS_MAX_RETRIES, BACKEND_WS_PATH,
     BACKEND_TLS, BACKEND_TLS_CA,
-    SENSOR_MODE,
+    SENSOR_MODE, ROOM_ID, MOCK_ROOM_IDS,
 )
 from sensor.receiver import open_ports, send_config, read_frame, CONFIG_FILE
 from sensor.metrics import ThroughputMetrics, start_metrics_monitor
@@ -30,7 +30,9 @@ logging.basicConfig(
 )
 log = logging.getLogger(__name__)
 
-_queue: queue.Queue = queue.Queue(maxsize=QUEUE_MAX_SIZE)
+# Size the queue for the workload: in multi-room mock the generator enqueues one
+# frame per room each tick, so the queue must hold more than the room count.
+_queue: queue.Queue = queue.Queue(maxsize=max(QUEUE_MAX_SIZE, len(MOCK_ROOM_IDS) * 3))
 _metrics = ThroughputMetrics()
 
 def enqueue_frame(frame: dict) -> None:
@@ -129,8 +131,9 @@ if __name__ == '__main__':
         start_metrics_monitor(_queue, _metrics)
 
         if SENSOR_MODE == "mock":
-            log.info("Starting in MOCK mode — generating fake occupancy data.")
-            mock_sensor_loop(enqueue_frame)  # runs until the process is stopped
+            rooms = MOCK_ROOM_IDS or [ROOM_ID]
+            log.info("Starting in MOCK mode — fake occupancy for %d room(s).", len(rooms))
+            mock_sensor_loop(enqueue_frame, rooms)  # runs until the process is stopped
         else:
             log.info("Starting in REAL mode — reading from the mmWave sensor.")
             cfg_port, data_port = open_ports()

@@ -54,8 +54,13 @@ Every setting comes from the environment. Edit `.env` (copied from `.env.example
 | `MOCK_INTERVAL` | `2.0` | Seconds between mock readings |
 | `MOCK_ROOM_CAPACITY` | `30` | Upper bound for the mock headcount |
 | `MOCK_MAX_STEP` | `2` | Largest change between two mock readings |
+| `MOCK_ROOM_IDS` | (empty) | Comma-separated room IDs to simulate from one container; empty = just `ROOM_ID_01` |
 
 For the real sensor, set `SENSOR_MODE=real` and map the serial devices (next section).
+
+To fill the whole dashboard from a single container, list the rooms in `MOCK_ROOM_IDS`
+(e.g. `MOCK_ROOM_IDS=006,011,137,i003`). One process simulates them all, each with its own
+curve — no need for one container per room. The queue grows automatically with the room count.
 
 ## Sending to the production server (TLS)
 
