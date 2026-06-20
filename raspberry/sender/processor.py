@@ -11,7 +11,7 @@ def map_to_occupancy(frame: dict) -> dict:
         OccupancyData als Dict (JSON-serialisierbar)
     """
     return {
-        "roomId":     ROOM_ID,
+        "roomId":     frame.get("roomId", ROOM_ID),  # Mock setzt pro Raum eine ID; Real-Pfad nutzt ROOM_ID
         "sensorId":   SENSOR_ID,
         "count":      frame.get("numDetectedTracks", 0),
         "confidence": frame.get("confidence", 1.0),  # Mock liefert echte Werte; Real-Pfad bleibt 1.0 bis echte Logik existiert
