@@ -13,7 +13,6 @@ interface AuthState {
     isAuthenticated: boolean;
     login: (username: string, password: string) => Promise<LoginResult>;
     logout: () => void;
-    initializeAuth: () => void;
 }
 
 // Keycloak connection — overridable via env, with local-dev defaults so the
@@ -60,23 +59,25 @@ function isExpired(token: string): boolean {
     return Date.now() >= claims.exp * 1000 - 5000;
 }
 
-export const useAuthStore = create<AuthState>((set) => ({
-    user: null,
-    token: null,
-    isAuthenticated: false,
+// Derive the initial auth state from a token left in localStorage by a previous
+// session. This runs synchronously when the store is created — i.e. before React's
+// first render — so a page reload (F5) restores the session up front and
+// ProtectedRoute sees the correct isAuthenticated value immediately, instead of
+// briefly treating the user as logged out and redirecting to /login.
+function loadInitialAuth(): Pick<AuthState, 'user' | 'token' | 'isAuthenticated'> {
+    const token = localStorage.getItem('token');
+    if (token && !isExpired(token)) {
+        return { token, user: userFromToken(token), isAuthenticated: true };
+    }
+    // Token missing or expired — clear any stale leftovers.
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    localStorage.removeItem('refresh_token');
+    return { user: null, token: null, isAuthenticated: false };
+}
 
-    // Restore a previous session from localStorage if the token is still valid.
-    initializeAuth: () => {
-        const token = localStorage.getItem('token');
-        if (token && !isExpired(token)) {
-            set({ token, user: userFromToken(token), isAuthenticated: true });
-        } else {
-            localStorage.removeItem('token');
-            localStorage.removeItem('user');
-            localStorage.removeItem('refresh_token');
-            set({ user: null, token: null, isAuthenticated: false });
-        }
-    },
+export const useAuthStore = create<AuthState>((set) => ({
+    ...loadInitialAuth(),
 
     // Real login: exchange HdM credentials for a Keycloak JWT (password grant).
     // Credentials go straight to Keycloak, which federates the HdM LDAP.
