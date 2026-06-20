@@ -1,9 +1,12 @@
 import { useState, useEffect } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { LayoutDashboard, ChartColumn, DoorOpen, PanelLeftOpen, PanelLeftClose, LogOut } from 'lucide-react';
+import { useAuthStore} from "../hooks/useAuthStore";
 
 export const Sidebar = () => {
     const location = useLocation(); // reads the current location (link gets correspondingly highlighted in color)
+
+    const navigate = useNavigate();
 
     // memory of sidebar state
     const [isCollapsed, setIsCollapsed] = useState(() => {
@@ -110,8 +113,9 @@ export const Sidebar = () => {
                             </button>
                             <button
                                 onClick={() => {
-                                    console.log("TODO for later: Logout-Logik with Keycloak");
+                                    useAuthStore.getState().logout();
                                     setShowLogoutDialog(false);
+                                    navigate('/login')
                                 }}
                                 className="px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors"
                             >
