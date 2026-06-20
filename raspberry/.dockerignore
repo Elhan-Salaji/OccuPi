@@ -1,0 +1,19 @@
+# Version control
+.git
+.gitignore
+
+# Python caches and local virtualenv
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Local configuration and secrets
+.env
+
+# Files not needed inside the image
+Dockerfile
+.dockerignore
+compose.yml
+README.md
+run.sh
