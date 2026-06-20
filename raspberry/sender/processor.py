@@ -14,6 +14,6 @@ def map_to_occupancy(frame: dict) -> dict:
         "roomId":     ROOM_ID,
         "sensorId":   SENSOR_ID,
         "count":      frame.get("numDetectedTracks", 0),
-        "confidence": 1.0,   # Platzhalter – später durch echte Logik ersetzen
+        "confidence": frame.get("confidence", 1.0),  # Mock liefert echte Werte; Real-Pfad bleibt 1.0 bis echte Logik existiert
         "timestamp":  datetime.now(timezone.utc).isoformat(),
     }
