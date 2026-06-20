@@ -27,6 +27,14 @@ BACKEND_PORT        = int(os.getenv("BACKEND_PORT",    "8080"))
 BACKEND_WS_PATH     = os.getenv("BACKEND_WS_PATH",     "/ws")
 STOMP_DESTINATION   = os.getenv("STOMP_DESTINATION",   "/app/data")
 
+# Connect over TLS (wss) instead of plain ws. Needed to reach the production
+# backend through the Nginx endpoint (occupi.mi.hdm-stuttgart.de:443). Leave off
+# for a local or internal backend.
+BACKEND_TLS         = os.getenv("BACKEND_TLS", "false").strip().lower() in ("1", "true", "yes")
+# Optional path to a CA bundle for verifying the server certificate. Empty uses
+# certifi's bundle, which trusts Let's Encrypt (the prod server's issuer).
+BACKEND_TLS_CA      = os.getenv("BACKEND_TLS_CA", "").strip()
+
 # --- Queue & Processing ---
 QUEUE_MAX_SIZE      = int(os.getenv("QUEUE_MAX_SIZE",      "100"))
 PROCESSING_INTERVAL = float(os.getenv("PROCESSING_INTERVAL", "0.1"))  # seconds (= 10fps)

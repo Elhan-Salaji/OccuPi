@@ -6,12 +6,14 @@ import threading
 import time
 import serial
 import stomp
+import certifi
 
 from config import (
     BACKEND_HOST, BACKEND_PORT,
     STOMP_DESTINATION,
     QUEUE_MAX_SIZE,
     WS_RECONNECT_DELAY, WS_MAX_RETRIES, BACKEND_WS_PATH,
+    BACKEND_TLS, BACKEND_TLS_CA,
     SENSOR_MODE,
 )
 from sensor.receiver import open_ports, send_config, read_frame, CONFIG_FILE
@@ -70,6 +72,12 @@ def _sender_loop() -> None:
         heartbeats=(25000, 25000),
         ws_path=BACKEND_WS_PATH,
     )
+    if BACKEND_TLS:
+        # Registering SSL for this host makes stomp.py use wss://. Passing ca_certs
+        # turns on server-certificate validation (without it stomp.py skips the check).
+        ca_bundle = BACKEND_TLS_CA or certifi.where()
+        conn.set_ssl(for_hosts=[(BACKEND_HOST, BACKEND_PORT)], ca_certs=ca_bundle)
+        log.info("TLS enabled: connecting via wss, verifying server cert against %s", ca_bundle)
 
     retries = 0
 
