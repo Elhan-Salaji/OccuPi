@@ -56,6 +56,11 @@ def mock_sensor_loop(enqueue_frame, room_ids) -> None:
         start = random.randint(0, max(1, capacity // 4))   # start lightly occupied
         state[room_id] = {"count": start, "target": start}
 
+    # Spread the per-room sends evenly across the interval instead of bursting them
+    # all at once — a single burst of many rooms overwhelms the backend ingestion,
+    # and a steady stream is also closer to how independent sensors behave.
+    per_room_delay = interval / max(1, len(room_ids))
+
     frame_num = 0
     log.info(
         "Mock generator started for %d room(s) (capacity=%d, interval=%.1fs, max_step=%d).",
@@ -76,10 +81,9 @@ def mock_sensor_loop(enqueue_frame, room_ids) -> None:
                 "numDetectedTracks": s["count"],
                 "confidence": _estimate_confidence(s["count"], capacity),
             })
+            time.sleep(per_room_delay)
 
         if len(room_ids) == 1:
-            only = room_ids[0]
-            log.info("Frame %d: %s -> %d people", frame_num, only, state[only]["count"])
+            log.info("Frame %d: %s -> %d people", frame_num, room_ids[0], state[room_ids[0]]["count"])
         else:
-            log.info("Tick %d: sent %d rooms", frame_num, len(room_ids))
-        time.sleep(interval)
+            log.info("Tick %d: sent %d rooms (paced)", frame_num, len(room_ids))

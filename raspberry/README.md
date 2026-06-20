@@ -62,6 +62,11 @@ To fill the whole dashboard from a single container, list the rooms in `MOCK_ROO
 (e.g. `MOCK_ROOM_IDS=006,011,137,i003`). One process simulates them all, each with its own
 curve — no need for one container per room. The queue grows automatically with the room count.
 
+The generator spreads its sends evenly across `MOCK_INTERVAL`. For many rooms, raise the
+interval so the backend can ingest every room: keep roughly `rooms ÷ interval ≲ 5` per
+second. For ~100 rooms use `MOCK_INTERVAL=30`; a single burst overwhelms the ingestion and
+some rooms get dropped.
+
 ## Sending to the production server (TLS)
 
 The production backend sits behind the host Nginx and is reachable only over `https`/`wss`
