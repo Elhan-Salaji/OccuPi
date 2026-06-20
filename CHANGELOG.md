@@ -48,6 +48,7 @@ backend, frontend, authentication, the sensor pipeline, and the containerized de
 - Renamed the project from RoomSystem to OccuPi (#87).
 - Aligned the room data types between frontend and backend (#133).
 - Pinned PostgreSQL to version 16 (#113).
+- Occupancy writes to InfluxDB are buffered and flushed in batches, so many rooms reporting at once no longer drop data (#177).
 
 ### Removed
 - Dropped the unused chart feature (#21).
