@@ -70,8 +70,12 @@ BACKEND_TLS=true
 ```
 
 `certifi` ships the CA bundle, so the Let's Encrypt server certificate validates out of the
-box. To pin a custom CA, point `BACKEND_TLS_CA` at a bundle file. The Pi has to reach
-`occupi.mi.hdm-stuttgart.de`, so run it inside the HdM network.
+box. To pin a custom CA, point `BACKEND_TLS_CA` at a bundle file. The endpoint is public
+(the same host as the website), so the Pi can send from any internet connection — no HdM
+network or VPN needed.
+
+The Pi talks to the backend, never to the database directly. InfluxDB and Postgres have no
+public ports on purpose; the backend is the only door, and `/ws` is already open for it.
 
 ## Real sensor mode
 
