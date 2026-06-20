@@ -49,12 +49,29 @@ Every setting comes from the environment. Edit `.env` (copied from `.env.example
 | `BACKEND_PORT` | `8080` | Backend port |
 | `BACKEND_WS_PATH` | `/ws` | WebSocket path |
 | `STOMP_DESTINATION` | `/app/data` | STOMP destination |
+| `BACKEND_TLS` | `false` | Connect over TLS (`wss`); set `true` for the production server |
 | `ROOM_ID_01` | `room-01` | Room of the first sensor |
 | `MOCK_INTERVAL` | `2.0` | Seconds between mock readings |
 | `MOCK_ROOM_CAPACITY` | `30` | Upper bound for the mock headcount |
 | `MOCK_MAX_STEP` | `2` | Largest change between two mock readings |
 
 For the real sensor, set `SENSOR_MODE=real` and map the serial devices (next section).
+
+## Sending to the production server (TLS)
+
+The production backend sits behind the host Nginx and is reachable only over `https`/`wss`
+at `occupi.mi.hdm-stuttgart.de`. The `/ws` ingestion endpoint is public (no token), so the
+Pi needs TLS and nothing else. Set this in `.env`:
+
+```bash
+BACKEND_HOST=occupi.mi.hdm-stuttgart.de
+BACKEND_PORT=443
+BACKEND_TLS=true
+```
+
+`certifi` ships the CA bundle, so the Let's Encrypt server certificate validates out of the
+box. To pin a custom CA, point `BACKEND_TLS_CA` at a bundle file. The Pi has to reach
+`occupi.mi.hdm-stuttgart.de`, so run it inside the HdM network.
 
 ## Real sensor mode
 
