@@ -4,6 +4,12 @@ import os
 ROOM_ID   = os.getenv("ROOM_ID",   "room-01")
 SENSOR_ID = os.getenv("SENSOR_ID", "sensor-01")
 
+# --- Sensor Mode ---
+# "mock" generates realistic fake occupancy data (no hardware needed) — used by the
+# container and for local testing. "real" reads from the mmWave sensor over serial.
+# Flip this in one place: the SENSOR_MODE entry of your .env file.
+SENSOR_MODE = os.getenv("SENSOR_MODE", "mock").strip().lower()
+
 # --- Serial ---
 SERIAL_CFG_PORT  = os.getenv("SERIAL_CFG_PORT",  "/dev/tty.usbserial-010BCEBF0")
 SERIAL_DATA_PORT = os.getenv("SERIAL_DATA_PORT", "/dev/tty.usbserial-010BCEBF1")
