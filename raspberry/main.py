@@ -15,7 +15,7 @@ from config import (
     SENSOR_MODE,
 )
 from sensor.receiver import open_ports, send_config, read_frame, CONFIG_FILE
-from sensor.metrics import ThroughputMetrics, start_metrics_monitor, log_snapshot
+from sensor.metrics import ThroughputMetrics, start_metrics_monitor
 from sender.processor import map_to_occupancy
 from mock_data import mock_sensor_loop
 from stomp import exception as stomp_exception
@@ -122,11 +122,7 @@ if __name__ == '__main__':
 
         if SENSOR_MODE == "mock":
             log.info("Starting in MOCK mode — generating fake occupancy data.")
-            mock_sensor_loop(enqueue_frame)
-            # wait for sender to drain the queue before logging final metrics
-            while not _queue.empty():
-                time.sleep(0.05)
-            log_snapshot(_queue, _metrics)
+            mock_sensor_loop(enqueue_frame)  # runs until the process is stopped
         else:
             log.info("Starting in REAL mode — reading from the mmWave sensor.")
             cfg_port, data_port = open_ports()

@@ -10,6 +10,11 @@ SENSOR_ID = os.getenv("SENSOR_ID", "sensor-01")
 # Flip this in one place: the SENSOR_MODE entry of your .env file.
 SENSOR_MODE = os.getenv("SENSOR_MODE", "mock").strip().lower()
 
+# --- Mock Generator (only used when SENSOR_MODE=mock) ---
+MOCK_INTERVAL      = float(os.getenv("MOCK_INTERVAL",      "2.0"))  # seconds between fake readings
+MOCK_ROOM_CAPACITY = int(os.getenv("MOCK_ROOM_CAPACITY",   "30"))   # max plausible headcount for the room
+MOCK_MAX_STEP      = int(os.getenv("MOCK_MAX_STEP",        "2"))    # max headcount change per reading
+
 # --- Serial ---
 SERIAL_CFG_PORT  = os.getenv("SERIAL_CFG_PORT",  "/dev/tty.usbserial-010BCEBF0")
 SERIAL_DATA_PORT = os.getenv("SERIAL_DATA_PORT", "/dev/tty.usbserial-010BCEBF1")
