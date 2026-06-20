@@ -32,6 +32,7 @@ backend, frontend, authentication, the sensor pipeline, and the containerized de
   auto-reconnect, and a bounded queue that drops the oldest frame under load.
 - Containerized sender with a single mock/real switch and realistic mock data (#164).
 - TLS (`wss`) so the Pi streams to the production server (#166).
+- Mock mode can fill many rooms from a single container via `MOCK_ROOM_IDS` (#173).
 
 **Authentication**
 - Keycloak OAuth2 resource server with HdM LDAP login; `/ws` ingestion stays public (#20).
