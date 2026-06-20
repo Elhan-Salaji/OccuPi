@@ -10,10 +10,5 @@ assignees: ''
 _Description of given issue._
 
 ## Tasks
-- [ ] 
-- [ ] 
-- [ ] 
-- [ ] 
-- [ ] 
-
-This issue can only be done after the finalisation of Issue #(insert Issue number here, if reliability)
+- [ ] _Task 1_
+- [ ] _Task 2_

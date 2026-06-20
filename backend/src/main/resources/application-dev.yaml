@@ -1,0 +1,3 @@
+# Local development profile — DO NOT use in production.
+# All REST endpoints are publicly accessible (no authentication required).
+# Override via: SPRING_PROFILES_ACTIVE=prod

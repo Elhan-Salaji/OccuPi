@@ -1,0 +1,49 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# SERVER / PRODUCTION overlay.
+#
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+#
+# Assumes an Nginx reverse proxy ALREADY runs on the host and terminates TLS.
+# Therefore only backend + keycloak are published — bound to 127.0.0.1 so they
+# are reachable by the host Nginx but NOT from the public internet. InfluxDB and
+# PostgreSQL get NO host ports at all (internal Docker network only).
+#
+# Requires docker/.env with at least: POSTGRES_PASSWORD, KEYCLOAK_ADMIN_PASSWORD,
+# KC_HOSTNAME (the public https host, e.g. occupi.mi.hdm-stuttgart.de).
+# ─────────────────────────────────────────────────────────────────────────────
+services:
+  backend:
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      JAVA_TOOL_OPTIONS: -Xms256m -Xmx512m
+      # Keycloak is served under /auth in prod (see KC_HTTP_RELATIVE_PATH below),
+      # so the internal JWKS path includes /auth too.
+      KEYCLOAK_JWK_SET_URI: http://keycloak:8080/auth/realms/occupi/protocol/openid-connect/certs
+    ports:
+      - "127.0.0.1:8080:8080"   # host Nginx → backend
+
+  # Pulled from GHCR (built in CI with the public prod URLs baked in via VITE_*).
+  # Published only to localhost; the host Nginx proxies "/" here.
+  frontend:
+    ports:
+      - "127.0.0.1:3000:80"   # host Nginx → frontend
+
+  keycloak:
+    environment:
+      # Public host of Keycloak (behind the TLS-terminating host Nginx).
+      KC_HOSTNAME: ${KC_HOSTNAME:?set KC_HOSTNAME in docker/.env}
+      KC_HOSTNAME_STRICT: "true"
+      # Served under https://<host>/auth — matches the host Nginx /auth route.
+      KC_HTTP_RELATIVE_PATH: /auth
+      # Keep the management/health endpoint (port 9000) at root, otherwise /auth
+      # also moves /health/ready and the container healthcheck fails (unhealthy).
+      KC_HTTP_MANAGEMENT_RELATIVE_PATH: "/"
+      # Trust X-Forwarded-* from the host Nginx (TLS terminated there).
+      KC_PROXY_HEADERS: xforwarded
+    # 'start' (not start-dev) for production; auto-builds on first run.
+    command: start --import-realm
+    ports:
+      - "127.0.0.1:8180:8080"   # host Nginx → keycloak
+
+  # influxdb & postgres intentionally have NO 'ports' here:
+  # they stay on the internal Docker network and are not exposed to the host.

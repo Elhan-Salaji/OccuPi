@@ -1,0 +1,108 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# OccuPi — BASE compose (shared by local and server)
+#
+# This file is NOT run on its own. It is always combined with an overlay:
+#
+#   Local development:   docker compose up -d
+#                        (auto-merges docker-compose.override.yml)
+#
+#   Server / production: docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+#
+# The base defines the services and the internal Docker network wiring only.
+# Host port publishing and environment that differs between local and server
+# live in the overlays.
+# ─────────────────────────────────────────────────────────────────────────────
+services:
+  backend:
+    # Prebuilt in CI and pulled from GHCR — the server never builds (see #140).
+    # The local overlay adds a `build:` so development still builds from source.
+    image: ghcr.io/elhan-salaji/occupi-backend:latest
+    container_name: occupi-backend
+    environment:
+      # Internal service-to-service URLs (same in every environment).
+      INFLUXDB_URL: http://influxdb:8181
+      POSTGRES_URL: jdbc:postgresql://postgres:5432/occupi
+      POSTGRES_USER: ${POSTGRES_USER:-occupi}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-occupi}
+      # JWKS reached via the internal hostname (works regardless of the external
+      # Keycloak hostname — that's why the backend uses jwk-set-uri, not issuer-uri).
+      KEYCLOAK_JWK_SET_URI: http://keycloak:8080/realms/occupi/protocol/openid-connect/certs
+    depends_on:
+      influxdb:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      keycloak:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # Frontend SPA, served by nginx inside the image. Prebuilt in CI with the PROD
+  # VITE_* URLs (Vite inlines them at build time) and pulled from GHCR. The local
+  # overlay adds a `build:` with localhost URLs so development builds from source.
+  frontend:
+    image: ghcr.io/elhan-salaji/occupi-frontend:latest
+    container_name: occupi-frontend
+    restart: unless-stopped
+
+  influxdb:
+    image: influxdb:3-core
+    container_name: occupi-influxdb3
+    environment:
+      - INFLUXDB3_HOST_ID=occupi-prod
+    command: serve --host-id occupi-prod --http-bind 0.0.0.0:8181 --object-store file --data-dir /var/lib/influxdb3 --without-auth
+    volumes:
+      - influxdb3-data:/var/lib/influxdb3
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8181/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
+  # PostgreSQL hosts two databases: 'occupi' (room metadata) and 'keycloak'
+  # (created on first start by ./postgres/init).
+  postgres:
+    image: postgres:16
+    container_name: occupi-postgres
+    environment:
+      POSTGRES_DB: occupi
+      POSTGRES_USER: ${POSTGRES_USER:-occupi}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-occupi}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-occupi}"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.2
+    container_name: occupi-keycloak
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_ADMIN:-admin}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-admin}
+      KC_HTTP_ENABLED: "true"
+      KC_HEALTH_ENABLED: "true"
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://postgres:5432/keycloak
+      KC_DB_USERNAME: ${POSTGRES_USER:-occupi}
+      KC_DB_PASSWORD: ${POSTGRES_PASSWORD:-occupi}
+    volumes:
+      - ./keycloak/realm-occupi.json:/opt/keycloak/data/import/realm-occupi.json:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/localhost/9000 && echo -e 'GET /health/ready HTTP/1.0\\r\\n\\r\\n' >&3 && grep -q 'UP' <&3"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    restart: unless-stopped
+
+volumes:
+  influxdb3-data:
+  postgres-data:

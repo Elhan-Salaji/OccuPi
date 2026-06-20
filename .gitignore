@@ -43,3 +43,7 @@ build/
 ### VS Code ###
 .vscode/
 
+docker/seed.py
+
+### Local secrets ###
+docker/.env

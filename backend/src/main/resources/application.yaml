@@ -1,3 +1,31 @@
+server:
+  port: 8080
+
 spring:
   application:
-    name: app
+    name: occupi
+  profiles:
+    active: dev
+  docker:
+    compose:
+      enabled: false
+  # No form-login / default in-memory user — auth is delegated to Keycloak (prod).
+  autoconfigure:
+    exclude: org.springframework.boot.security.autoconfigure.UserDetailsServiceAutoConfiguration
+  datasource:
+    url: ${POSTGRES_URL:jdbc:postgresql://localhost:5432/occupi}
+    username: ${POSTGRES_USER:occupi}
+    password: ${POSTGRES_PASSWORD:occupi}
+  jpa:
+    hibernate:
+      ddl-auto: update
+    open-in-view: false
+
+influxdb:
+  url: http://localhost:8181
+  database: occupi
+  token: ""
+
+logging:
+  level:
+    com.occupi: DEBUG

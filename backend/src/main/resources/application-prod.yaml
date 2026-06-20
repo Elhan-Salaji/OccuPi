@@ -1,0 +1,17 @@
+# Production profile — activated via SPRING_PROFILES_ACTIVE=prod on the server.
+# SecurityConfig is active in this profile (all requests require a valid Keycloak JWT).
+#
+# JWT validation uses the realm's JWK set. We deliberately use jwk-set-uri (not
+# issuer-uri) so that validation works inside the Docker network where the
+# backend reaches Keycloak via the internal hostname while tokens carry the
+# external issuer (KC_HOSTNAME) — issuer-uri discovery would reject the mismatch.
+spring:
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          jwk-set-uri: ${KEYCLOAK_JWK_SET_URI:http://localhost:8180/realms/occupi/protocol/openid-connect/certs}
+
+logging:
+  level:
+    com.occupi: INFO

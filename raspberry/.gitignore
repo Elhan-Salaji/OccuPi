@@ -1,0 +1,10 @@
+# Python bytecode and caches
+__pycache__/
+*.py[cod]
+
+# Virtual environment (created by run.sh)
+.venv/
+venv/
+
+# Local configuration and secrets (never commit)
+.env

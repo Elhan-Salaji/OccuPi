@@ -1,0 +1,37 @@
+name: Frontend CI
+
+on:
+  push:
+    branches: [develop, main]
+    paths:
+      - 'frontend/**'
+  pull_request:
+    branches: [develop, main]
+    paths:
+      - 'frontend/**'
+
+jobs:
+  build:
+    name: Lint & Build
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Lint
+        working-directory: frontend
+        run: npm run lint
+
+      - name: Build
+        working-directory: frontend
+        run: npm run build

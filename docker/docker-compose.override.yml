@@ -1,0 +1,54 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# LOCAL development overlay — applied automatically by `docker compose up`.
+#
+# Publishes all service ports to the host for convenience (REST, test pages,
+# Pi simulation, direct DB access) and runs in the open 'dev' profile.
+#
+# Tip: for active backend development you can run only the infra here
+# (docker compose up -d influxdb postgres keycloak) and start the backend
+# locally with `./mvnw spring-boot:run` against these ports.
+# ─────────────────────────────────────────────────────────────────────────────
+services:
+  backend:
+    # Local builds from source; prod pulls the GHCR image defined in the base.
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+    environment:
+      # 'dev' = all endpoints open (no auth). Override to 'prod' to test auth locally.
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
+    ports:
+      - "8080:8080"
+
+  # Built SPA at http://localhost:3000 (an occupi-frontend webOrigin in Keycloak).
+  # For hot-reload development run Vite directly instead (npm run dev → :5173).
+  frontend:
+    # Local builds from source with localhost URLs; prod pulls the GHCR image
+    # (built in CI with the prod URLs) defined in the base.
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: http://localhost:8080/api
+        VITE_KEYCLOAK_URL: http://localhost:8180
+        VITE_KEYCLOAK_REALM: occupi
+        VITE_KEYCLOAK_CLIENT_ID: occupi-frontend
+    ports:
+      - "3000:80"
+
+  influxdb:
+    ports:
+      - "8181:8181"
+
+  postgres:
+    ports:
+      - "5432:5432"
+
+  keycloak:
+    environment:
+      KC_HOSTNAME: localhost
+      KC_HOSTNAME_PORT: "8180"
+      KC_HOSTNAME_STRICT: "false"
+    command: start-dev --import-realm
+    ports:
+      - "8180:8080"
