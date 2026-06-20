@@ -8,13 +8,14 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.Captor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.Instant;
 import java.util.List;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
@@ -25,6 +26,9 @@ class OccupancyServiceTest {
     @Mock
     private OccupancyRepository occupancyRepository;
 
+    @Captor
+    private ArgumentCaptor<List<OccupancyData>> batchCaptor;
+
     private OccupancyService service;
 
     @BeforeEach
@@ -32,43 +36,73 @@ class OccupancyServiceTest {
         service = new OccupancyService(occupancyRepository);
     }
 
+    private OccupancyData sample(String roomId) {
+        return OccupancyData.builder()
+                .roomId(roomId)
+                .sensorId("sensor-A")
+                .count(12)
+                .confidence(0.92)
+                .timestamp(Instant.now())
+                .build();
+    }
+
     @Nested
-    @DisplayName("recordOccupancy()")
-    class RecordOccupancy {
+    @DisplayName("recordOccupancy() + flushBuffer()")
+    class BufferAndFlush {
 
         @Test
-        @DisplayName("should delegate to repository with correct data")
-        void shouldDelegateToRepository() {
-            OccupancyData data = OccupancyData.builder()
-                    .roomId("seminar-101")
-                    .sensorId("sensor-A")
-                    .count(12)
-                    .confidence(0.92)
-                    .timestamp(Instant.now())
-                    .build();
+        @DisplayName("buffers measurements without writing until flushed")
+        void buffersUntilFlush() {
+            service.recordOccupancy(sample("room-1"));
 
-            service.recordOccupancy(data);
-
-            ArgumentCaptor<OccupancyData> captor = ArgumentCaptor.forClass(OccupancyData.class);
-            verify(occupancyRepository).save(captor.capture());
-
-            OccupancyData saved = captor.getValue();
-            assertEquals("seminar-101", saved.getRoomId());
-            assertEquals("sensor-A", saved.getSensorId());
-            assertEquals(12, saved.getCount());
-            assertEquals(0.92, saved.getConfidence());
+            verify(occupancyRepository, never()).save(any());
+            verify(occupancyRepository, never()).saveBatch(any());
         }
 
         @Test
-        @DisplayName("should propagate repository exceptions")
-        void shouldPropagateExceptions() {
-            doThrow(new IllegalArgumentException("invalid"))
-                    .when(occupancyRepository).save(any());
+        @DisplayName("flush writes all buffered points as a single batch")
+        void flushWritesOneBatch() {
+            service.recordOccupancy(sample("room-1"));
+            service.recordOccupancy(sample("room-2"));
+            service.recordOccupancy(sample("room-3"));
 
-            OccupancyData data = OccupancyData.builder().build();
+            service.flushBuffer();
 
-            assertThrows(IllegalArgumentException.class,
-                    () -> service.recordOccupancy(data));
+            verify(occupancyRepository).saveBatch(batchCaptor.capture());
+            assertEquals(3, batchCaptor.getValue().size());
+        }
+
+        @Test
+        @DisplayName("flush with an empty buffer does nothing")
+        void flushEmptyIsNoop() {
+            service.flushBuffer();
+
+            verify(occupancyRepository, never()).saveBatch(any());
+        }
+
+        @Test
+        @DisplayName("flush drains the buffer so a second flush writes nothing")
+        void flushDrainsBuffer() {
+            service.recordOccupancy(sample("room-1"));
+
+            service.flushBuffer();
+            service.flushBuffer();
+
+            verify(occupancyRepository, times(1)).saveBatch(any());
+        }
+
+        @Test
+        @DisplayName("on a failed batch, retries each point individually and does not throw")
+        void retriesIndividuallyOnBatchFailure() {
+            service.recordOccupancy(sample("room-1"));
+            service.recordOccupancy(sample("room-2"));
+            doThrow(new RuntimeException("influx unavailable"))
+                    .when(occupancyRepository).saveBatch(any());
+
+            service.flushBuffer();
+
+            verify(occupancyRepository).saveBatch(any());
+            verify(occupancyRepository, times(2)).save(any());
         }
     }
 
@@ -79,16 +113,7 @@ class OccupancyServiceTest {
         @Test
         @DisplayName("should delegate batch to repository")
         void shouldDelegateBatchToRepository() {
-            List<OccupancyData> batch = List.of(
-                    OccupancyData.builder()
-                            .roomId("seminar-101").sensorId("sensor-A")
-                            .count(10).confidence(0.9).timestamp(Instant.now())
-                            .build(),
-                    OccupancyData.builder()
-                            .roomId("seminar-101").sensorId("sensor-B")
-                            .count(12).confidence(0.88).timestamp(Instant.now())
-                            .build()
-            );
+            List<OccupancyData> batch = List.of(sample("room-1"), sample("room-2"));
 
             service.recordBatch(batch);
 
