@@ -14,6 +14,9 @@ SENSOR_MODE = os.getenv("SENSOR_MODE", "mock").strip().lower()
 MOCK_INTERVAL      = float(os.getenv("MOCK_INTERVAL",      "2.0"))  # seconds between fake readings
 MOCK_ROOM_CAPACITY = int(os.getenv("MOCK_ROOM_CAPACITY",   "30"))   # max plausible headcount for the room
 MOCK_MAX_STEP      = int(os.getenv("MOCK_MAX_STEP",        "2"))    # max headcount change per reading
+# Comma-separated room IDs to simulate from this single container (e.g. "006,011,137").
+# Empty = just ROOM_ID. Lets one mock container fill many rooms at once (no hardware).
+MOCK_ROOM_IDS      = [r.strip() for r in os.getenv("MOCK_ROOM_IDS", "").split(",") if r.strip()]
 
 # --- Serial ---
 SERIAL_CFG_PORT  = os.getenv("SERIAL_CFG_PORT",  "/dev/tty.usbserial-010BCEBF0")
