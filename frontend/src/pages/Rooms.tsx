@@ -1,8 +1,8 @@
+import { useState, useEffect } from "react";
 import { useRoomStore } from '../hooks/useRoomStore.ts';
 import { StatusBadge, OccupancyBar } from '../components/RoomStatus.tsx';
 import { useFetchRooms } from '../hooks/useFetchRooms';
 import type { Room } from '../types/room';
-import React from 'react';
 
 const columns: { label: string; render: (r: Room) => React.ReactNode }[] = [
     {label: 'Raum', render: (r) => r.name },
@@ -33,8 +33,16 @@ function formatTime(timestamp: string) {
 
 export default function Rooms(){
     const { rooms } = useRoomStore();
-
+    const [, setTick] = useState(0);
     useFetchRooms();
+
+    useEffect(() => {
+        const id = setInterval(() => {
+            setTick((tick) => tick + 1);
+        }, 60000)
+
+        return () => clearInterval(id);
+    }, []);
 
     return (
 
