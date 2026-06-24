@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useCallback } from 'react';
 import { useRoomStore } from './useRoomStore';
 import { MOCK_ROOMS } from '../utils/mockData';
 import api from '../utils/api';
@@ -8,7 +8,7 @@ export function useFetchRooms() {
     // we retrieve spaces and function for setting them from the sore
     const { setRooms, isConnected } = useRoomStore();
 
-    const fetchRooms = async () => {
+    const fetchRooms = useCallback (async() => {
         try {
             const [roomsRes, occupancyRes] = await Promise.all([
                 api.get<RoomResponse[]>('/rooms'),
@@ -34,11 +34,11 @@ export function useFetchRooms() {
             console.error("Fehler beim Laden:", error);
             setRooms(MOCK_ROOMS);
         }
-    };
+    }, [setRooms]);
 
     useEffect(() => {
         fetchRooms();
-    }, [setRooms]);
+    }, [setRooms, fetchRooms]);
 
     useEffect(() => {
         if (isConnected) return;
@@ -48,6 +48,6 @@ export function useFetchRooms() {
         }, 30000);
 
         return () => clearInterval(id);
-    }, [isConnected]);
+    }, [isConnected, fetchRooms]);
 
 }
