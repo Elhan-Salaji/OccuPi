@@ -22,7 +22,7 @@ export const useRoomStore = create<RoomState>((set) => ({
             if (room.roomId !== roomId) return room;
             const ratio = count / room.capacity;
             const occupancyRate = ratio < 0.5 ? 'low' : ratio < 0.8 ? 'medium' : 'high';
-            return { ...room, count, occupancyRate };
+            return { ...room, count, occupancyRate, timestamp: new Date().toISOString() };
         }),
     })),
 
