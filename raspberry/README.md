@@ -62,7 +62,8 @@ Every setting comes from the environment. Edit `.env` (copied from `.env.example
 | `MOCK_MAX_STEP` | `2` | Largest change between two mock readings |
 | `MOCK_ROOM_IDS` | (empty) | Comma-separated room IDs to simulate from one container; empty = just `ROOM_ID_01` |
 
-For the real sensor, set `SENSOR_MODE=real` and map the serial devices (next section).
+For the real sensor, set `SENSOR_MODE=real`; the serial devices are already mapped on
+`sensor-01` (next section).
 
 To fill the whole dashboard from a single container, list the rooms in `MOCK_ROOM_IDS`
 (e.g. `MOCK_ROOM_IDS=006,011,137,i003`). One process simulates them all, each with its own
