@@ -7,6 +7,12 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+- Wired the real TI IWR6843 mmWave radar into the Pi sender: `sensor-01` in
+  `raspberry/compose.yml` maps the radar's two CP2105 USB serial ports and adds the
+  `dialout` group, so on the Pi a plain `docker compose up` with `SENSOR_MODE=real` streams
+  live occupancy for room 137 (#201).
+
 ## [0.1.0] - 2026-06-20
 
 First full release. The complete OccuPi system now runs live on the HdM server:
