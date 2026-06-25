@@ -7,6 +7,12 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+- Real-sensor Compose overlay (`raspberry/compose.real.yml`) that wires the TI IWR6843
+  radar into the Pi sender — its two CP2105 USB serial ports plus the `dialout` group — and
+  forces `SENSOR_MODE=real`, so pulling on the Pi streams live occupancy instead of mock
+  data. The base `compose.yml` stays mock-by-default (#201).
+
 ## [0.1.0] - 2026-06-20
 
 First full release. The complete OccuPi system now runs live on the HdM server:

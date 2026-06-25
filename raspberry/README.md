@@ -89,33 +89,36 @@ public ports on purpose; the backend is the only door, and `/ws` is already open
 
 ## Real sensor mode
 
-The container needs the sensor's two USB serial devices and membership in the serial
-group. USB enumeration order changes across reboots, so use the stable by-id paths. List
-them:
+The physical radar lives in a separate Compose overlay, `compose.real.yml`, so the base
+`compose.yml` stays mock-by-default and runs on any machine without the sensor. The overlay
+hands `sensor-01` its two USB serial devices, adds the `dialout` group, and forces
+`SENSOR_MODE=real`. Start it on the Pi with both files:
+
+```bash
+docker compose -f compose.yml -f compose.real.yml up -d --build
+docker compose -f compose.yml -f compose.real.yml logs -f
+```
+
+To let a plain `docker compose` command pick the overlay up automatically, set this in
+`.env` on the Pi:
+
+```bash
+COMPOSE_FILE=compose.yml:compose.real.yml
+```
+
+The IWR6843 exposes its two UARTs through an onboard Silicon Labs CP2105: `if00` is the
+config/CLI port (115200 baud), `if01` the data port (921600 baud). USB enumeration order is
+not stable across reboots, so the overlay maps the stable by-id paths. For a different unit,
+list the paths and update the two mappings in `compose.real.yml`:
 
 ```bash
 ls -l /dev/serial/by-id/
 ```
 
-In `compose.yml`, uncomment the `SERIAL_*`, `devices`, and `group_add` lines for
-`sensor-01` and fill in the paths:
-
-```yaml
-    environment:
-      SENSOR_ID: sensor-01
-      ROOM_ID: ${ROOM_ID_01:-room-01}
-      SERIAL_CFG_PORT: /dev/ttyUSB0
-      SERIAL_DATA_PORT: /dev/ttyUSB1
-    devices:
-      - "/dev/serial/by-id/usb-...-if00:/dev/ttyUSB0"   # config port
-      - "/dev/serial/by-id/usb-...-if01:/dev/ttyUSB1"   # data port
-    group_add:
-      - dialout
-```
-
-The `dialout` group in the container must match the group that owns the device on the
-host. Check with `ls -l /dev/ttyUSB0` and `getent group dialout`. If the GID differs, put
-the numeric GID in `group_add` instead of the name.
+The `dialout` group in the container must match the group that owns the device on the host.
+Check with `ls -l /dev/ttyUSB0` and `getent group dialout`; if the GID differs, put the
+numeric GID in `group_add` instead of the name. If you see no detections, the config and
+data ports are swapped — exchange the two `SERIAL_*` values in the overlay.
 
 ## Two sensors
 

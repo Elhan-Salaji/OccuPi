@@ -1,0 +1,36 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# OccuPi — real-sensor overlay (Raspberry Pi only)
+#
+# Adds the physical TI IWR6843 mmWave radar to sensor-01: its two USB serial
+# devices — exposed through the onboard Silicon Labs CP2105 dual UART — plus the
+# dialout group needed to open them, and forces SENSOR_MODE=real.
+#
+# Kept out of compose.yml on purpose: the base file stays mock-by-default so it
+# runs on any machine without the sensor attached. This overlay is only valid on
+# the Pi the radar is plugged into.
+#
+# Run on the Pi:
+#   docker compose -f compose.yml -f compose.real.yml up -d --build
+# Or set this in .env so a plain `docker compose up` picks the overlay up too:
+#   COMPOSE_FILE=compose.yml:compose.real.yml
+#
+# The CP2105 exposes if00 (config/CLI port, 115200) and if01 (data port, 921600).
+# USB enumeration order is not stable across reboots, so the by-id paths below are
+# the stable identifiers. For a different unit, find the paths with:
+#   ls -l /dev/serial/by-id/
+# and update the two device mappings.
+# ─────────────────────────────────────────────────────────────────────────────
+
+services:
+  sensor-01:
+    environment:
+      # This overlay IS real mode — set it here so a stale SENSOR_MODE=mock in
+      # .env can't leave the wired-up sensor sitting idle on mock data.
+      SENSOR_MODE: real
+      SERIAL_CFG_PORT: /dev/ttyUSB0
+      SERIAL_DATA_PORT: /dev/ttyUSB1
+    devices:
+      - "/dev/serial/by-id/usb-Silicon_Labs_CP2105_Dual_USB_to_UART_Bridge_Controller_010BCEBF-if00-port0:/dev/ttyUSB0"  # config/CLI
+      - "/dev/serial/by-id/usb-Silicon_Labs_CP2105_Dual_USB_to_UART_Bridge_Controller_010BCEBF-if01-port0:/dev/ttyUSB1"  # data
+    group_add:
+      - dialout

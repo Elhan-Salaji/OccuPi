@@ -30,18 +30,10 @@ services:
     environment:
       SENSOR_ID: sensor-01
       ROOM_ID: ${ROOM_ID_01:-room-01}
-      # Real mode — the in-container device names the mapping below targets:
-      # SERIAL_CFG_PORT: /dev/ttyUSB0
-      # SERIAL_DATA_PORT: /dev/ttyUSB1
-    # ── Real mode only ────────────────────────────────────────────────────────
-    # Hand this sensor's two USB serial devices to the container and grant the
-    # serial group. Use stable by-id paths — USB enumeration order is not stable
-    # across reboots. Find them with:  ls -l /dev/serial/by-id/
-    # devices:
-    #   - "/dev/serial/by-id/usb-...-if00:/dev/ttyUSB0"   # config port
-    #   - "/dev/serial/by-id/usb-...-if01:/dev/ttyUSB1"   # data port
-    # group_add:
-    #   - dialout
+    # Real sensor? The two USB serial devices and the dialout group live in the
+    # compose.real.yml overlay, so this base file stays mock-by-default and runs
+    # without the radar attached. On the Pi:
+    #   docker compose -f compose.yml -f compose.real.yml up -d --build
 
   # Second sensor — opt-in. Start with:
   #   docker compose --profile second-sensor up -d --build
