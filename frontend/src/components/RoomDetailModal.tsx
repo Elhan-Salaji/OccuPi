@@ -21,7 +21,7 @@ export const RoomDetailModal = ({room, isOpen, onClose}: RoomDetailModalProps) =
         fetchHistory(room.roomId, timeRange).then(setHistory);
         fetchForecast(room.roomId,timeRange).then(setForecast);
         fetchWeekPattern(room.roomId).then(setWeekPattern);
-    }, [room?.roomId, timeRange]);
+    }, [room?.roomId, timeRange, isOpen]);
 
     useEffect(() => {
         const handleEsc = (e: KeyboardEvent) => {

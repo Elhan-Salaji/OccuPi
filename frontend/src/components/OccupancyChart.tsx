@@ -26,6 +26,7 @@ export const OccupancyChart = ({ historyPoints, forecastPoints, capacity }: Occu
                 <Area dataKey="predictedCount" stroke="#8b5cf6" fill="#8b5cf6" fillOpacity={0.1} strokeDasharray="5 5" />
                 <ReferenceLine x={nowLine} />
                 <Tooltip labelFormatter={(t) => new Date(t).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}
+                         // eslint-disable-next-line @typescript-eslint/no-explicit-any
                          formatter={(value: any, name?: string | number) => [Math.round(value), name === 'count' ? 'Belegung' : 'Prognose']} />
             </ComposedChart>
         </ResponsiveContainer>
