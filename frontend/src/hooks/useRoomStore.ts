@@ -8,6 +8,8 @@ interface RoomState {
     updateRoom: (roomId: string, count: number) => void;
     isConnected: boolean;
     setIsConnected: (value: boolean) => void;
+    isMockData: boolean;
+    setIsMockData: (value: boolean) => void;
 }
 
 export const useRoomStore = create<RoomState>((set) => ({
@@ -22,11 +24,13 @@ export const useRoomStore = create<RoomState>((set) => ({
             if (room.roomId !== roomId) return room;
             const ratio = count / room.capacity;
             const occupancyRate = ratio < 0.5 ? 'low' : ratio < 0.8 ? 'medium' : 'high';
-            return { ...room, count, occupancyRate };
+            return { ...room, count, occupancyRate, timestamp: new Date().toISOString() };
         }),
     })),
 
     isConnected: false,
     setIsConnected: (value) => set({ isConnected: value}),
+    isMockData: false,
+    setIsMockData: (value) => set({isMockData: value }),
 
 }));

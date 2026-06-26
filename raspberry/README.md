@@ -26,17 +26,23 @@ headcount, a confidence value, and a timestamp:
 - Docker with the Compose plugin.
 - For real mode: the IWR6843 connected over USB. It exposes a config port and a data port.
 
-## Quick start (mock)
+## Quick start
+
+With the sensor attached, the default `docker compose up` brings up `sensor-01`; `SENSOR_MODE`
+in `.env` decides real vs. mock:
 
 ```bash
 cd raspberry
-cp .env.example .env          # optional: mock runs on the built-in defaults
+cp .env.example .env          # then set SENSOR_MODE and ROOM_ID_01
 docker compose up -d --build
 docker compose logs -f
 ```
 
-You should see lines like `Frame 12: 6 people (target=6, confidence=0.95)`. To send to
-your backend, set `BACKEND_HOST` and `BACKEND_PORT` in `.env` (default `localhost:8080`).
+You should see lines like `Frame 12: Detected 6 people`. To send to your backend, set
+`BACKEND_HOST` and `BACKEND_PORT` in `.env` (default `localhost:8080`).
+
+No sensor attached? `sensor-01` maps the radar's USB devices, so Docker won't start it on a
+machine without them — use the hardware-free mock via `run.sh` (see Local development below).
 
 ## Configuration
 
@@ -56,7 +62,8 @@ Every setting comes from the environment. Edit `.env` (copied from `.env.example
 | `MOCK_MAX_STEP` | `2` | Largest change between two mock readings |
 | `MOCK_ROOM_IDS` | (empty) | Comma-separated room IDs to simulate from one container; empty = just `ROOM_ID_01` |
 
-For the real sensor, set `SENSOR_MODE=real` and map the serial devices (next section).
+For the real sensor, set `SENSOR_MODE=real`; the serial devices are already mapped on
+`sensor-01` (next section).
 
 To fill the whole dashboard from a single container, list the rooms in `MOCK_ROOM_IDS`
 (e.g. `MOCK_ROOM_IDS=006,011,137,i003`). One process simulates them all, each with its own
@@ -89,33 +96,36 @@ public ports on purpose; the backend is the only door, and `/ws` is already open
 
 ## Real sensor mode
 
-The container needs the sensor's two USB serial devices and membership in the serial
-group. USB enumeration order changes across reboots, so use the stable by-id paths. List
-them:
+`sensor-01` in `compose.yml` is already wired for the radar: it maps the two USB serial
+devices and adds the `dialout` group the non-root container needs to open them. The only
+switch left is the mode — set it in `.env` on the Pi:
+
+```bash
+SENSOR_MODE=real
+ROOM_ID_01=137      # the room this sensor reports
+```
+
+Then bring it up; the device mapping is part of the default service, so a plain
+`docker compose up` is all it takes:
+
+```bash
+docker compose up -d --build
+docker compose logs -f      # expect: Frame N: Detected X people
+```
+
+The IWR6843 exposes its two UARTs through an onboard Silicon Labs CP2105: `if00` is the
+config/CLI port (115200 baud), `if01` the data port (921600 baud). USB enumeration order is
+not stable across reboots, so `compose.yml` maps the stable by-id paths. For a different
+unit, list the paths and update the two mappings on `sensor-01`:
 
 ```bash
 ls -l /dev/serial/by-id/
 ```
 
-In `compose.yml`, uncomment the `SERIAL_*`, `devices`, and `group_add` lines for
-`sensor-01` and fill in the paths:
-
-```yaml
-    environment:
-      SENSOR_ID: sensor-01
-      ROOM_ID: ${ROOM_ID_01:-room-01}
-      SERIAL_CFG_PORT: /dev/ttyUSB0
-      SERIAL_DATA_PORT: /dev/ttyUSB1
-    devices:
-      - "/dev/serial/by-id/usb-...-if00:/dev/ttyUSB0"   # config port
-      - "/dev/serial/by-id/usb-...-if01:/dev/ttyUSB1"   # data port
-    group_add:
-      - dialout
-```
-
-The `dialout` group in the container must match the group that owns the device on the
-host. Check with `ls -l /dev/ttyUSB0` and `getent group dialout`. If the GID differs, put
-the numeric GID in `group_add` instead of the name.
+The `dialout` group in the container must match the group that owns the device on the host.
+Check with `ls -l /dev/ttyUSB0` and `getent group dialout`; if the GID differs, put the
+numeric GID in `group_add` instead of the name. If you see no detections, the config and
+data ports are swapped — exchange the two `SERIAL_*` values on `sensor-01`.
 
 ## Two sensors
 

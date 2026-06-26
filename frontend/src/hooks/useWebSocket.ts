@@ -2,7 +2,6 @@ import { useEffect, useRef } from 'react';
 import { Client } from '@stomp/stompjs';
 import SockJS from 'sockjs-client';
 import { useRoomStore } from './useRoomStore';
-import type { Occupancy } from '../types/room';
 
 export function useWebSocket() {
     const { updateRoom, setIsConnected } = useRoomStore();
@@ -16,8 +15,15 @@ export function useWebSocket() {
             onConnect: () => {
                 setIsConnected(true);
                 client.subscribe('/topic/occupancy', (message) => {
-                    const data: Occupancy = JSON.parse(message.body);
-                    updateRoom(data.roomId, data.count);
+                    try {
+                        const data= JSON.parse(message.body);
+                        if (typeof data.roomId === 'string' && typeof data.count === 'number') {
+                            updateRoom(data.roomId, data.count);
+                        }
+                    } catch (e) {
+                        console.error('Failed to parse occupancy message:', e);
+                    }
+
                 });
             },
             onDisconnect: () => setIsConnected(false),

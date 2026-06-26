@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRoomStore } from '../hooks/useRoomStore';
 import { StatusBadge, OccupancyBar } from '../components/RoomStatus';
 import { RoomDetailModal} from "../components/RoomDetailModal";
@@ -19,17 +19,33 @@ const columns: { label: string; render: (r: Room) => React.ReactNode }[] = [
 function formatTime(timestamp: string) {
     if (!timestamp) return '—';
     const diff = Math.round((Date.now() - new Date(timestamp).getTime()) / 1000);
+    const now = new Date();
+    const date = new Date(timestamp);
+    const time = date.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+    const dateStr = date.toLocaleDateString('de-DE', { day: 'numeric', month: 'long' });
+    const dateStrWithYear = date.toLocaleDateString('de-DE', { day: 'numeric', month: 'long', year: 'numeric' });
     if (diff < 60) return 'gerade eben';
     if (diff < 3600) return `vor ${Math.floor(diff / 60)} Min`;
-    return new Date(timestamp).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+    if (diff < 86400) return time;
+    if (now.getFullYear() === date.getFullYear()) {
+        return `${time}, ${dateStr}`;
+    }
+    return `${time}, ${dateStrWithYear}`;
 }
 
 export default function Rooms(){
     const { rooms } = useRoomStore();
-
+    const [, setTick] = useState(0);
     useFetchRooms();
-
     const [selectedRoom, setSelectedRoom] = useState<Room | null>(null);
+
+    useEffect(() => {
+        const id = setInterval(() => {
+            setTick((tick) => tick + 1);
+        }, 60000)
+
+        return () => clearInterval(id);
+    }, []);
 
     return (
 
