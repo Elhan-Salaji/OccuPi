@@ -6,12 +6,55 @@ export interface Occupancy{
     timestamp: string;
 }
 
-//Was wird in Zukunft passieren?
-export interface Forecast{
+
+export interface ForecastPoint {
+    time: string;
+    predictedCount: number;
+}
+
+export interface HistoryPoint {
+    time: string;
+    count: number;
+    confidence: number;
+}
+
+export interface TimeSlotSummary {
+    dayOfWeek: string;
+    hour: number;
+    avgRate: number;
+}
+
+export interface WeekPatternSlot {
+    dayOfWeek: string;
+    hour: number;
+    avgOccupancy: number;
+    avgRate: number;
+}
+
+// GET /api/forecast?roomId=X&forecastHours=12
+export interface ForecastResponse {
     roomId: string;
-    forecastTime: string;
-    predictedOccupancy: number;
-    probability: number; //Algorithmus
+    forecastHours: number;
+    forecast: ForecastPoint[];
+    confidence: number;
+    generatedAt: string;
+}
+
+// GET /api/occupancy/history?roomId=X&hours=24
+export interface HistoryResponse {
+    roomId: string;
+    points: HistoryPoint[];
+    start: string;
+    end: string;
+}
+
+// GET /api/occupancy/weekpattern?roomId=X&weeks=8
+export interface WeekPatternResponse {
+    roomId: string;
+    weeks: number;
+    pattern: WeekPatternSlot[];
+    peakTime: TimeSlotSummary;
+    quietTime: TimeSlotSummary;
 }
 
 export interface Room {

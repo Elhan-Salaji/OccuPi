@@ -1,12 +1,17 @@
+import { useState} from 'react';
 import { useRoomStore } from '../hooks/useRoomStore';
 import { Users, Activity } from 'lucide-react';
 import { useFetchRooms } from '../hooks/useFetchRooms';
+import type { Room} from "../types/room";
+import { RoomDetailModal} from "../components/RoomDetailModal";
 
 export default function Dashboard() {
     // we retrieve spaces and function for setting them from the sore
     const { rooms, isConnected, isMockData } = useRoomStore();
 
     useFetchRooms();
+
+    const [selectedRoom, setSelectedRoom] = useState<Room | null>(null);
 
     return (
         <div className="max-w-7xl mx-auto">
@@ -32,7 +37,8 @@ export default function Dashboard() {
             {/* grid for rooms */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {rooms.map((room) => (
-                    <div key={room.roomId} className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 hover:shadow-md transition-shadow">
+                    <div key={room.roomId} className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 hover:shadow-md transition-shadow cursor-pointer"
+                    onClick={() => setSelectedRoom(room)}>
                         <div className="flex justify-between items-start mb-4">
                             <div>
                                 <h3 className="font-bold text-lg text-gray-800">{room.name}</h3>
@@ -67,6 +73,9 @@ export default function Dashboard() {
                     </div>
                 ))}
             </div>
+            {selectedRoom && (
+            <RoomDetailModal room={selectedRoom!} isOpen={selectedRoom !== null} onClose={() => setSelectedRoom(null)} />
+            )}
         </div>
     );
 }

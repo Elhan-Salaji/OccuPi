@@ -36,7 +36,7 @@ export function useFetchRooms() {
             setRooms(MOCK_ROOMS);
             setIsMockData(true);
         }
-    }, [setRooms]);
+    }, [setRooms, setIsMockData]);
 
     useEffect(() => {
         fetchRooms();

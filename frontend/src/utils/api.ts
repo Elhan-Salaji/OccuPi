@@ -1,5 +1,6 @@
 import axios from 'axios';
-import { useAuthStore, TOKEN_ENDPOINT, CLIENT_ID} from "../hooks/useAuthStore";
+import { useAuthStore, TOKEN_ENDPOINT, CLIENT_ID } from "../hooks/useAuthStore";
+import type { ForecastResponse, HistoryResponse, WeekPatternResponse } from "../types/room";
 
 const api = axios.create({
     baseURL: import.meta.env.VITE_API_URL,
@@ -71,5 +72,20 @@ api.interceptors.response.use(
         return Promise.reject(error);
     }
 );
+
+export function fetchHistory(roomId: string, hours: number = 24): Promise<HistoryResponse> {
+    return api.get<HistoryResponse>('/occupancy/history',
+        { params: {roomId, hours } }).then(res => res.data);
+}
+
+export function fetchForecast(roomId: string, forecastHours: number = 12): Promise<ForecastResponse> {
+    return api.get<ForecastResponse>('/forecast',
+        { params: { roomId, forecastHours } }).then(res => res.data);
+}
+
+export function fetchWeekPattern(roomId: string, weeks: number = 8): Promise<WeekPatternResponse> {
+    return api.get<WeekPatternResponse>('/occupancy/weekpattern',
+        { params: { roomId, weeks } }).then(res => res.data);
+}
 
 export default api;

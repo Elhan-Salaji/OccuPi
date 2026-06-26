@@ -2,6 +2,8 @@ import { useRoomStore } from '../hooks/useRoomStore';
 import { StatusBadge} from '../components/RoomStatus';
 import {useState} from "react";
 import { useFetchRooms } from '../hooks/useFetchRooms';
+import { RoomDetailModal} from "../components/RoomDetailModal";
+import type { Room } from '../types/room'
 
 function SummaryCard({ label, value }: {label: string; value: string | number }) {
     return (
@@ -21,6 +23,7 @@ export default function Analytics() {
     const [buildingFilter, setBuildingFilter] = useState('');
     const [statusFilter, setStatusFilter] = useState('');
     const [sortBy, setSortBy] = useState('');
+    const [selectedRoom, setSelectedRoom] = useState<Room | null>(null);
 
     //Filtered & sorted room list
     const filteredRooms = rooms
@@ -115,7 +118,8 @@ export default function Analytics() {
                     </thead>
                     <tbody>
                     {filteredRooms.map((room) => (
-                        <tr key={room.roomId} className="border-b border-gray-100 hover:bg-gray-50">
+                        <tr key={room.roomId} className="border-b border-gray-100 hover:bg-gray-50 cursor-pointer"
+                        onClick={() => setSelectedRoom(room)}>
                             <td className="px-4 py-3 text-sm font-medium text-gray-900">
                                 {room.name}
                                 <span className="ml-2 text-gray-400 font-normal">{room.roomId}</span>
@@ -130,6 +134,9 @@ export default function Analytics() {
                     </tbody>
                 </table>
             </div>
+            {selectedRoom && (
+                <RoomDetailModal room={selectedRoom} isOpen={true} onClose={() => setSelectedRoom(null)} />
+            )}
 
         </div>
 
