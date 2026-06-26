@@ -21,7 +21,7 @@ export function StatusBadge({ occupancyRate }: { occupancyRate: Room['occupancyR
 }
 
 export function OccupancyBar({count, capacity}: {count: number; capacity: number}) {
-    const pct = Math.round((count / capacity)*100);
+    const pct = capacity > 0 ? Math.round((count / capacity)*100) : 0;
 
     return (
         <div className="flex items-center gap-2">
