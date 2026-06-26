@@ -1,6 +1,5 @@
 import axios from 'axios';
 import { useAuthStore, TOKEN_ENDPOINT, CLIENT_ID } from "../hooks/useAuthStore";
-import { MOCK_FORECAST, MOCK_HISTORY, MOCK_WEEKPATTERN } from "./mockData";
 import type { ForecastResponse, HistoryResponse, WeekPatternResponse } from "../types/room";
 
 const api = axios.create({
@@ -75,15 +74,18 @@ api.interceptors.response.use(
 );
 
 export function fetchHistory(roomId: string, hours: number = 24): Promise<HistoryResponse> {
-    return Promise.resolve(MOCK_HISTORY);
+    return api.get<HistoryResponse>('/occupancy/history',
+        { params: {roomId, hours } }).then(res => res.data);
 }
 
 export function fetchForecast(roomId: string, forecastHours: number = 12): Promise<ForecastResponse> {
-    return Promise.resolve(MOCK_FORECAST);
+    return api.get<ForecastResponse>('/forecast',
+        { params: { roomId, forecastHours } }).then(res => res.data);
 }
 
 export function fetchWeekPattern(roomId: string, weeks: number = 8): Promise<WeekPatternResponse> {
-    return Promise.resolve(MOCK_WEEKPATTERN);
+    return api.get<WeekPatternResponse>('/occupancy/weekpattern',
+        { params: { roomId, weeks } }).then(res => res.data);
 }
 
 export default api;
