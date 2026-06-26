@@ -18,6 +18,12 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `dialout` group, so on the Pi a plain `docker compose up` with `SENSOR_MODE=real` streams
   live occupancy for room 137 (#201).
 
+### Security
+- Room create, update and delete (`POST`/`PUT`/`DELETE /api/rooms`) now require the
+  Keycloak `admin` realm role, enforced with method security (`@PreAuthorize`) on the
+  controller on top of the existing URL rules. Reads (`GET`) stay open to any
+  authenticated user (#219).
+
 ## [0.1.0] - 2026-06-20
 
 First full release. The complete OccuPi system now runs live on the HdM server:

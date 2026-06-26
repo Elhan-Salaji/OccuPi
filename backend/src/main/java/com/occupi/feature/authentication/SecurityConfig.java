@@ -5,6 +5,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.config.Customizer;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
@@ -21,13 +22,18 @@ import org.springframework.security.web.SecurityFilterChain;
  * <ul>
  *   <li>{@code /ws/**} — public (Raspberry Pi STOMP ingestion)</li>
  *   <li>OpenAPI / Swagger UI — public</li>
- *   <li>Room mutations (POST/PUT/DELETE {@code /api/rooms/**}) — {@code ADMIN} only</li>
+ *   <li>Room mutations (POST/PUT/DELETE {@code /api/rooms/**}) — {@code admin} role only,
+ *       enforced both here at the URL level and via {@code @PreAuthorize} on the controller</li>
  *   <li>everything else — any authenticated user with a valid JWT</li>
  * </ul>
+ *
+ * {@link EnableMethodSecurity} turns on the {@code @PreAuthorize} checks used by the
+ * room write endpoints (#219).
  */
 @Profile("!test & !dev")
 @Configuration
 @EnableWebSecurity
+@EnableMethodSecurity
 public class SecurityConfig {
 
     @Bean

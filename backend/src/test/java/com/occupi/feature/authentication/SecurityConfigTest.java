@@ -17,8 +17,10 @@ import org.springframework.test.web.servlet.MockMvc;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
@@ -75,5 +77,43 @@ class SecurityConfigTest {
                         .content("{\"roomId\":\"room-1\",\"name\":\"X\",\"building\":\"M\",\"floor\":1,\"capacity\":10}")
                         .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_ADMIN"))))
                 .andExpect(status().isCreated());
+    }
+
+    @Test
+    @DisplayName("rejects a room update with 403 when the token lacks ADMIN")
+    void updateRoom_nonAdmin_returns403() throws Exception {
+        mvc.perform(put("/api/rooms/room-1")
+                        .contentType("application/json")
+                        .content("{\"roomId\":\"room-1\",\"name\":\"X\",\"building\":\"M\",\"floor\":1,\"capacity\":10}")
+                        .with(jwt()))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("allows a room update for an ADMIN token")
+    void updateRoom_admin_returns200() throws Exception {
+        when(roomService.updateRoom(any(), any()))
+                .thenReturn(new RoomResponse("room-1", "X", "M", 1, 10));
+
+        mvc.perform(put("/api/rooms/room-1")
+                        .contentType("application/json")
+                        .content("{\"roomId\":\"room-1\",\"name\":\"X\",\"building\":\"M\",\"floor\":1,\"capacity\":10}")
+                        .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_ADMIN"))))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    @DisplayName("rejects a room deletion with 403 when the token lacks ADMIN")
+    void deleteRoom_nonAdmin_returns403() throws Exception {
+        mvc.perform(delete("/api/rooms/room-1").with(jwt()))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("allows a room deletion for an ADMIN token")
+    void deleteRoom_admin_returns204() throws Exception {
+        mvc.perform(delete("/api/rooms/room-1")
+                        .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_ADMIN"))))
+                .andExpect(status().isNoContent());
     }
 }

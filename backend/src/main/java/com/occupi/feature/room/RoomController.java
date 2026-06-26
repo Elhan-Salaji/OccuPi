@@ -4,6 +4,7 @@ import com.occupi.feature.room.dto.RoomRequest;
 import com.occupi.feature.room.dto.RoomResponse;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -26,8 +27,8 @@ import java.util.List;
  * DELETE /api/rooms/{id}   → delete room    (admin only)
  * </pre>
  *
- * Note: admin-only enforcement (role checks) is wired in with the authentication
- * feature (#20 / #34). Until then these endpoints follow the global SecurityConfig.
+ * Write operations are restricted to the Keycloak {@code admin} realm role via
+ * {@code @PreAuthorize} (method security); reads stay open to any authenticated user (#219).
  */
 @RestController
 @RequestMapping("/api/rooms")
@@ -52,18 +53,21 @@ public class RoomController {
     }
 
     @PostMapping
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<RoomResponse> createRoom(@RequestBody RoomRequest request) {
         RoomResponse created = roomService.createRoom(request);
         return ResponseEntity.status(HttpStatus.CREATED).body(created);
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<RoomResponse> updateRoom(@PathVariable String id,
                                                    @RequestBody RoomRequest request) {
         return ResponseEntity.ok(roomService.updateRoom(id, request));
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Void> deleteRoom(@PathVariable String id) {
         roomService.deleteRoom(id);
         return ResponseEntity.noContent().build();
