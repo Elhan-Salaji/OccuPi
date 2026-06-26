@@ -4,7 +4,7 @@ import { useFetchRooms } from '../hooks/useFetchRooms';
 
 export default function Dashboard() {
     // we retrieve spaces and function for setting them from the sore
-    const { rooms, isConnected } = useRoomStore();
+    const { rooms, isConnected, isMockData } = useRoomStore();
 
     useFetchRooms();
 
@@ -22,6 +22,12 @@ export default function Dashboard() {
                     </span>
                 </div>
             </header>
+
+            {isMockData && (
+                <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-sm text-yellow-800">
+                    Konnte keine Echtzeitdaten laden | Beispieldaten werden angezeigt
+                </div>
+            )}
 
             {/* grid for rooms */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

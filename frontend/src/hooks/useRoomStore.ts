@@ -8,6 +8,8 @@ interface RoomState {
     updateRoom: (roomId: string, count: number) => void;
     isConnected: boolean;
     setIsConnected: (value: boolean) => void;
+    isMockData: boolean;
+    setIsMockData: (value: boolean) => void;
 }
 
 export const useRoomStore = create<RoomState>((set) => ({
@@ -28,5 +30,7 @@ export const useRoomStore = create<RoomState>((set) => ({
 
     isConnected: false,
     setIsConnected: (value) => set({ isConnected: value}),
+    isMockData: false,
+    setIsMockData: (value) => set({isMockData: value }),
 
 }));

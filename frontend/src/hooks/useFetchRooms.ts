@@ -6,7 +6,7 @@ import type { Room, RoomResponse, Occupancy } from '../types/room';
 
 export function useFetchRooms() {
     // we retrieve spaces and function for setting them from the sore
-    const { setRooms, isConnected } = useRoomStore();
+    const { setRooms, isConnected, setIsMockData } = useRoomStore();
 
     const fetchRooms = useCallback (async() => {
         try {
@@ -30,9 +30,11 @@ export function useFetchRooms() {
 
             // as long as there are no room data in the DB, show / use mock data
             setRooms(combined.length > 0 ? combined : MOCK_ROOMS);
+            setIsMockData(combined.length === 0);
         } catch (error) {
             console.error("Fehler beim Laden:", error);
             setRooms(MOCK_ROOMS);
+            setIsMockData(true);
         }
     }, [setRooms]);
 
