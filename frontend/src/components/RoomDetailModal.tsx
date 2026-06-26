@@ -54,7 +54,7 @@ export const RoomDetailModal = ({room, isOpen, onClose}: RoomDetailModalProps) =
                     </div>
                     <div className="bg-gray-50 rounded-lg p-4">
                         <p className="text-sm text-gray-500">Auslastung</p>
-                        <p className="text-2xl font-bold">{Math.round(room.count / room.capacity * 100)}%</p>
+                        <p className="text-2xl font-bold">{room.capacity > 0 ? Math.round(room.count / room.capacity * 100) : 0}%</p>
                     </div>
                 </div>
 
