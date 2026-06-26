@@ -23,27 +23,42 @@ export const WeekPatternHeatmap = ({ pattern, peakTime, quietTime}: WeekPattern)
     };
 
     return (
-        <div className="grid grid-cols-[auto_repeat(24,1fr)] gap-1">
+        <>
+            <div className="grid grid-cols-[auto_repeat(24,1fr)] gap-1">
 
-            {/*Header with hours */}
-            <div />
-            {hours.map(h => (
-                <div key={h} className="text-xs text-gray-400 text-center">
-                {h % 3 === 0 ? h : ''}
-                </div>))}
+                {/*Header with hours */}
+                <div />
+                {hours.map(h => (
+                    <div key={h} className="text-xs text-gray-400 text-center">
+                    {h % 3 === 0 ? h : ''}
+                    </div>))}
 
-            {/* Weekday per Line */}
-            {weekDays.map(day => (
-                <React.Fragment key={day}>
-                    <div>{dayLabels[day]}</div> {/* MO, Di, Mi...*/}
-                    {hours.map(hour => {
-                        const slot = pattern.find(s => s.dayOfWeek === day && s.hour === hour);
-                        const color = getColor(slot?.avgRate ?? 0);
-                        return <div key={hour} className={`${color} h-6 rounded-sm`} />
-                    })}
-                </React.Fragment>
-            ))}
-        </div>
+                {/* Weekday per Line */}
+                {weekDays.map(day => (
+                    <React.Fragment key={day}>
+                        <div>{dayLabels[day]}</div> {/* MO, Di, Mi...*/}
+                        {hours.map(hour => {
+                            const slot = pattern.find(s => s.dayOfWeek === day && s.hour === hour);
+                            const color = getColor(slot?.avgRate ?? 0);
+                            return <div key={hour} className={`${color} h-6 rounded-sm`} />
+                        })}
+                    </React.Fragment>
+                ))}
+            </div>
+            <div className="grid grid-cols-2 gap-4 mt-4">
+                <div className="bg-red-50 rounded-lg p-4">
+                    <p className="text-sm text-gray-500">Stoßzeit</p>
+                    <p className="text-lg font-bold text-red-600">{dayLabels[peakTime.dayOfWeek]} {peakTime.hour}:00</p>
+                    <p className="text-sm text-gray-400">{Math.round(peakTime.avgRate * 100)}% Auslastung</p>
+                </div>
+                <div className="bg-green-50 rounded-lg p-4">
+                    <p className="text-sm text-gray-500"> Beste Zeit (8-18 Uhr)</p>
+                    <p className="text-lg font-bold text-green-600">{dayLabels[quietTime.dayOfWeek]} {quietTime.hour}:00</p>
+                    <p className="text-sm text-gray-400">{Math.round(quietTime.avgRate * 100)}%</p>
+                </div>
+            </div>
+        </>
+
     )
 
 };
