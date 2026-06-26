@@ -12,12 +12,14 @@ from config import (
     STOMP_DESTINATION,
     QUEUE_MAX_SIZE,
     WS_RECONNECT_DELAY, WS_MAX_RETRIES, BACKEND_WS_PATH,
+    VISUALIZER_MAX_FPS,
 )
 from sensor.receiver import open_ports, send_config, read_frame, CONFIG_FILE
 from sensor.metrics import ThroughputMetrics, start_metrics_monitor, log_snapshot
 from sender.processor import map_to_occupancy
 from mock_data import mock_sensor_loop
 from stomp import exception as stomp_exception
+from visualizer.visualizer import start_visualizer, update as visualizer_update
 
 # Logging configuration
 logging.basicConfig(
@@ -112,6 +114,7 @@ def start_sender() -> None:
 
 # Set to False for real sensor data
 USE_MOCK = True
+USE_VISUALIZER = True
 # Main execution
 if __name__ == '__main__':
     cfg_port = None
@@ -130,11 +133,26 @@ if __name__ == '__main__':
         else:
             cfg_port, data_port = open_ports()
             send_config(cfg_port, CONFIG_FILE)
+
+            if USE_VISUALIZER:
+                start_visualizer()
+
+            render_interval = 1.0 / VISUALIZER_MAX_FPS
+            last_render = 0.0
+
             while True:
                 t_start = time.monotonic()
-                frame_num, people_count = read_frame(data_port)
+                frame_num, people_count, point_cloud, targets = read_frame(data_port)
                 enqueue_frame({"frameNum": frame_num, "numDetectedTracks": people_count})
-                latency = (time.monotonic() - t_start) * 1000  # ms
+
+                # Throttled rendering: a full redraw can take longer than one
+                # sensor frame (55ms); rendering every frame backs up the
+                # serial buffer until it overflows and the parser desyncs.
+                if USE_VISUALIZER and t_start - last_render >= render_interval:
+                    visualizer_update(point_cloud, targets)
+                    last_render = t_start
+
+                latency = (time.monotonic() - t_start) * 1000
                 log.info(f"Frame {frame_num}: Detected {people_count} people | Latency: {latency:.1f}ms")
 
     except serial.SerialException as e:
