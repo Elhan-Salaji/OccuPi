@@ -1,7 +1,10 @@
 import { Search } from 'lucide-react';
 import { User } from 'lucide-react';
+import { useAuthStore} from "../hooks/useAuthStore";
 
 export const Navbar = () => {
+    const { user } = useAuthStore();
+
     return (
         <header className="h-20 bg-white border-b border-gray-200 flex items-center justify-between px-6 shadow-sm z-10 shrink-0">
 
@@ -30,11 +33,10 @@ export const Navbar = () => {
                 </div>
                 <div className="text-sm">
                     <p className="text-gray-900">
-                        Logged in as: <span className="font-bold">[Student Name]</span>
-                        {/* TODO: delete mock name and mock role and fetch + show Username and Role from Keycloak token*/}
+                        Logged in as: <span className="font-bold">{user?.username ?? 'Unbenannt'}</span>
                     </p>
                     <p className="text-gray-500 text-xs mt-0.5">
-                        Role: <span className="font-medium text-gray-500">Student</span>
+                        Role: <span className="font-medium text-gray-500">{user?.role ?? 'Unbekannt'}</span>
                     </p>
                 </div>
             </div>
