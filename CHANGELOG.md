@@ -8,6 +8,11 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 ### Added
+- Occupancy history and weekly-pattern REST endpoints for the room detail view:
+  `GET /api/occupancy/history` returns the recent time series (raw points within 24h,
+  downsampled to 30-minute slots beyond that), and `GET /api/occupancy/weekpattern`
+  returns the per-weekday/hour averages over the last N weeks with the peak and quiet
+  times (#199).
 - Wired the real TI IWR6843 mmWave radar into the Pi sender: `sensor-01` in
   `raspberry/compose.yml` maps the radar's two CP2105 USB serial ports and adds the
   `dialout` group, so on the Pi a plain `docker compose up` with `SENSOR_MODE=real` streams
