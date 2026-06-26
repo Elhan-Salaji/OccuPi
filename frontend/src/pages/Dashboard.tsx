@@ -55,7 +55,7 @@ export default function Dashboard() {
                                     room.occupancyRate === 'low' ? 'bg-green-500' :
                                         room.occupancyRate === 'medium' ? 'bg-yellow-500' : 'bg-red-500'
                                 }`}
-                                style={{ width: `${(room.count / room.capacity) * 100}%` }}
+                                style={{ width: `${room.capacity > 0 ? (room.count / room.capacity) * 100 : 0}%` }}
                             />
                         </div>
                     </div>
