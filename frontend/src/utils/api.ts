@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { useAuthStore} from "../hooks/useAuthStore";
 
 const api = axios.create({
     baseURL: import.meta.env.VITE_API_URL,
@@ -25,9 +26,10 @@ api.interceptors.request.use(
 api.interceptors.response.use(
     (response) => response,
     (error) => {
-        if (error.response?.status === 401) {
-            // Wenn ungültig ist -> Login
-            window.location.href = '/login';
+        const isTokenRequest =
+            error.config?.url?.includes('/openid-connect/token');
+        if (error.response?.status === 401 && !isTokenRequest) {
+            useAuthStore.getState().logout();
         }
         return Promise.reject(error);
     }
