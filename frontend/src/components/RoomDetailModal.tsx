@@ -14,13 +14,14 @@ export const RoomDetailModal = ({room, isOpen, onClose}: RoomDetailModalProps) =
     const [history, setHistory] = useState<HistoryResponse | null>(null);
     const [forecast, setForecast] = useState<ForecastResponse | null>(null);
     const [weekPattern, setWeekPattern] = useState<WeekPatternResponse | null>(null);
+    const [timeRange, setTimeRange] = useState(24);
 
     useEffect(() => {
         if (!isOpen) return;
-        fetchHistory(room.roomId).then(setHistory);
-        fetchForecast(room.roomId).then(setForecast);
+        fetchHistory(room.roomId, timeRange).then(setHistory);
+        fetchForecast(room.roomId,timeRange).then(setForecast);
         fetchWeekPattern(room.roomId).then(setWeekPattern);
-    }, [room?.roomId]);
+    }, [room?.roomId, timeRange]);
 
     useEffect(() => {
         const handleEsc = (e: KeyboardEvent) => {
@@ -60,7 +61,17 @@ export const RoomDetailModal = ({room, isOpen, onClose}: RoomDetailModalProps) =
                 {/* Occupancy Chart */}
                 {history && forecast && (
                     <div className="mb-6">
-                        <h3 className="text-lg font-semibold mb-2"> Verlauf & Prognose</h3>
+                        <div className="flex items-center justify-between mb-2">
+                            <h3 className="text-lg font-semibold"> Verlauf & Prognose</h3>
+                            <div className="flex gap-1">
+                                {[1, 3, 12, 24, 168].map(h => (
+                                    <button key={h} onClick={() => setTimeRange(h)}
+                                    className={`px-3 py-1 text-sm rounded-lg ${timeRange === h ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
+                                        {h === 168 ? '1W' : `${h}h`}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
                         <OccupancyChart historyPoints={history.points} forecastPoints={forecast.forecast} capacity={room.capacity} />
                         <p className="text-sm text-gray-400 mt-1">Backend-Forecast · Konfidenz {Math.round(forecast.confidence * 100)}%</p>
                     </div>
