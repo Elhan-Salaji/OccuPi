@@ -46,3 +46,19 @@ METRICS_INTERVAL = float(os.getenv("METRICS_INTERVAL", "10")) # seconds between 
 # --- WebSocket Reconnect ---
 WS_RECONNECT_DELAY = int(os.getenv("WS_RECONNECT_DELAY", "5"))  # seconds until next try
 WS_MAX_RETRIES     = int(os.getenv("WS_MAX_RETRIES", "0"))  # 0 = infinite retries
+
+# --- Visualizer ---
+# Live matplotlib view of the point cloud and tracked targets. Only used in real
+# (sensor) mode; mock mode never opens it. Off by default so the headless/
+# containerised sensor isn't affected — run with USE_VISUALIZER=true on a Pi or
+# desktop that has a display.
+USE_VISUALIZER     = os.getenv("USE_VISUALIZER", "false").strip().lower() in ("1", "true", "yes")
+# Cap redraws so rendering never starves the serial read loop (sensor sends ~18fps).
+VISUALIZER_MAX_FPS = float(os.getenv("VISUALIZER_MAX_FPS", "10"))
+
+# Floor map boundary (metres). Ceiling mount: the sensor sits in the room centre
+# looking down, so the map is centred on the sensor (origin) and symmetric.
+BOUNDARY_X_MIN = -4
+BOUNDARY_X_MAX = 4
+BOUNDARY_Y_MIN = -4
+BOUNDARY_Y_MAX = 4
