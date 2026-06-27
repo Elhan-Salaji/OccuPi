@@ -47,3 +47,11 @@ docker/seed.py
 
 ### Local secrets ###
 docker/.env
+
+### Python (raspberry/) ###
+.venv/
+__pycache__/
+*.pyc
+
+### macOS ###
+.DS_Store
