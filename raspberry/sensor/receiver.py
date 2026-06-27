@@ -9,11 +9,11 @@ import struct
 # Configuration for the AOP 6m sensor
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 RASPBERRY_DIR = str(os.path.dirname(BASE_DIR))
-CONFIG_FILE = os.path.join(RASPBERRY_DIR, "chirp_configs", "AOP_6m_default.cfg")
+CONFIG_FILE = os.path.join(RASPBERRY_DIR, "chirp_configs", "aop_overhead_3m_radial.cfg")
 
 
 # Serial port settings loaded from config.py
-# Override via environment variables if needed for different device than raspberry pi(e.g. SERIAL_CFG_PORT=COM3 on Windows)
+# Override via environment variables if needed for a different device than raspberry pi (e.g. SERIAL_CFG_PORT=COM3 on Windows)
 sys.path.insert(0, RASPBERRY_DIR)
 from config import (
     SERIAL_CFG_PORT, SERIAL_DATA_PORT,
@@ -56,6 +56,20 @@ def _read_sensor_mounting():
 SENSOR_HEIGHT_M, SENSOR_TILT_RAD = _read_sensor_mounting()
 _COS_TILT = math.cos(SENSOR_TILT_RAD)
 _SIN_TILT = math.sin(SENSOR_TILT_RAD)
+
+
+def _rotate(x, y, z):
+    """Rotate sensor-frame coordinates by the mounting elevation tilt. Matches the
+    TI visualizer's eulerRot for a zero azimuth tilt (our overhead mount)."""
+    return x, y * _COS_TILT + z * _SIN_TILT, z * _COS_TILT - y * _SIN_TILT
+
+
+def _to_room_frame(x, y, z):
+    """Position in the room frame: rotate by the tilt, then lift by the mounting
+    height — the same transform the TI tracker applies to point cloud *and* tracks,
+    so circles and points end up in one coordinate system (floor = z 0)."""
+    rx, ry, rz = _rotate(x, y, z)
+    return rx, ry, SENSOR_HEIGHT_M + rz
 
 # Logging is configured once in main.py; here we only grab the module logger
 # (re-running basicConfig would duplicate every log line — see #104).
@@ -159,10 +173,15 @@ def read_frame(data_port):
                 for i in range(num_targets):
                     tid, posX, posY, posZ, velX, velY, velZ = struct.unpack_from(
                         'I6f', payload, i * TRACK_SIZE_BYTES)
+                    # Same room-frame transform as the point cloud, so the track
+                    # circles line up with the points (velocity is a direction, so
+                    # it is only rotated, not height-shifted).
+                    px, py, pz = _to_room_frame(posX, posY, posZ)
+                    vx, vy, vz = _rotate(velX, velY, velZ)
                     targets.append({
                         "tid": tid,
-                        "posX": posX, "posY": posY, "posZ": posZ,
-                        "velX": velX, "velY": velY, "velZ": velZ,
+                        "posX": px, "posY": py, "posZ": pz,
+                        "velX": vx, "velY": vy, "velZ": vz,
                     })
 
             elif tlv_type == TLV_POINT_CLOUD:
@@ -174,14 +193,11 @@ def read_frame(data_port):
                     elev = elevation * elev_unit
                     azim = azimuth * azim_unit
                     r    = range_ * range_unit
-                    x   = r * math.cos(elev) * math.sin(azim)
-                    y_r = r * math.cos(elev) * math.cos(azim)
-                    z_r = r * math.sin(elev)
-                    # Rotate by the mounting tilt and add the mounting height so
-                    # points land in the room frame the tracker reports targets
-                    # in (floor = z 0, sensor at z = SENSOR_HEIGHT_M)
-                    y = y_r * _COS_TILT + z_r * _SIN_TILT
-                    z = SENSOR_HEIGHT_M + z_r * _COS_TILT - y_r * _SIN_TILT
+                    x, y, z = _to_room_frame(
+                        r * math.cos(elev) * math.sin(azim),
+                        r * math.cos(elev) * math.cos(azim),
+                        r * math.sin(elev),
+                    )
                     point_cloud.append({
                         "x": x, "y": y, "z": z,
                         "doppler": doppler * dopp_unit,
