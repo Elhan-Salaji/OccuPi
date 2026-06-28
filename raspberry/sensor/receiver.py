@@ -1,3 +1,5 @@
+import math
+
 import serial
 import os
 import logging
@@ -7,11 +9,11 @@ import struct
 # Configuration for the AOP 6m sensor
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 RASPBERRY_DIR = str(os.path.dirname(BASE_DIR))
-CONFIG_FILE = os.path.join(RASPBERRY_DIR, "chirp_configs", "AOP_6m_default.cfg")
+CONFIG_FILE = os.path.join(RASPBERRY_DIR, "chirp_configs", "aop_overhead_3m_radial.cfg")
 
 
 # Serial port settings loaded from config.py
-# Override via environment variables if needed for different device than raspberry pi(e.g. SERIAL_CFG_PORT=COM3 on Windows)
+# Override via environment variables if needed for a different device than raspberry pi (e.g. SERIAL_CFG_PORT=COM3 on Windows)
 sys.path.insert(0, RASPBERRY_DIR)
 from config import (
     SERIAL_CFG_PORT, SERIAL_DATA_PORT,
@@ -30,6 +32,47 @@ TLV_POINT_CLOUD = 1020
 TLV_TARGET_INDEX = 1011
 TLV_TARGET_HEIGHT = 1012
 
+# Sanity limits: values beyond these mean we are reading garbage after byte
+# loss (serial buffer overflow) and must resync instead of blocking on reads
+MAX_TLVS = 16
+MAX_TLV_BYTES = 16384
+MAX_FRAME_BYTES = 65536
+
+
+def _read_sensor_mounting():
+    """Reads sensorPosition (height, elevation tilt) from the chirp config so the
+    point cloud can be transformed into the same room frame the tracker uses."""
+    try:
+        with open(CONFIG_FILE) as f:
+            for line in f:
+                if line.startswith('sensorPosition'):
+                    vals = line.split()[1:]
+                    return float(vals[0]), math.radians(float(vals[2]))
+    except (OSError, ValueError, IndexError):
+        pass
+    return 0.0, 0.0
+
+
+SENSOR_HEIGHT_M, SENSOR_TILT_RAD = _read_sensor_mounting()
+_COS_TILT = math.cos(SENSOR_TILT_RAD)
+_SIN_TILT = math.sin(SENSOR_TILT_RAD)
+
+
+def _rotate(x, y, z):
+    """Rotate sensor-frame coordinates by the mounting elevation tilt. Matches the
+    TI visualizer's eulerRot for a zero azimuth tilt (our overhead mount)."""
+    return x, y * _COS_TILT + z * _SIN_TILT, z * _COS_TILT - y * _SIN_TILT
+
+
+def _to_room_frame(x, y, z):
+    """Position in the room frame: rotate by the tilt, then lift by the mounting
+    height — the same transform the TI tracker applies to point cloud *and* tracks,
+    so circles and points end up in one coordinate system (floor = z 0)."""
+    rx, ry, rz = _rotate(x, y, z)
+    return rx, ry, SENSOR_HEIGHT_M + rz
+
+# Logging is configured once in main.py; here we only grab the module logger
+# (re-running basicConfig would duplicate every log line — see #104).
 log = logging.getLogger(__name__)
 
 
@@ -66,41 +109,104 @@ def send_config(cfg_port, config_file):
             log.info(f"Sent: {line.strip()} | Response: {response.strip()}")
 
 
+def _resync(data_port, reason: str) -> None:
+    """Drops buffered bytes after a desync so we re-lock on the next magic word."""
+    log.warning(f"Serial desync ({reason}) – flushing input buffer and resyncing.")
+    data_port.reset_input_buffer()
+
+
 # Read the data from the data port, parse the frames, and extract the people count
 def read_frame(data_port):
-    # We read byte by byte until we find the magic word that indicates the start of a frame.
-    # Then we read the header and TLVs to extract the number of detected people.
-    buffer = bytearray()
+    window = bytearray()
     while True:
         byte = data_port.read(1)
-        buffer += byte
-        if buffer[-8:] == MAGIC_WORD:
-            log.debug("Magic word found")
+        if not byte:
+            continue  # read timeout, keep waiting for data
+        window += byte
+        if len(window) > 8:
+            del window[:-8]
+        if window != MAGIC_WORD:
+            continue
 
-            # Empty buffer to save memory
-            buffer = bytearray()
+        log.debug("Magic word found")
+        window.clear()
 
-            # Refer to the User Guide for Frame Structure and Header details
-            header_bytes = data_port.read(32)
-            (version,
-             total_length,
-             platform,
-             frame_num,
-             time_cpu_cycles,
-             num_detected_obj,
-             num_tlvs,
-             sub_frame) = struct.unpack('8I', header_bytes)
+        header_bytes = data_port.read(32)
+        if len(header_bytes) < 32:
+            _resync(data_port, "incomplete frame header")
+            continue
+        (version,
+         total_length,
+         platform,
+         frame_num,
+         time_cpu_cycles,
+         num_detected_obj,
+         num_tlvs,
+         sub_frame) = struct.unpack('8I', header_bytes)
 
-            # Iterate through TLVs and export people count
-            num_targets = 0
-            for _ in range(num_tlvs):
-                tlv_header = data_port.read(8)
-                tlv_type, tlv_length = struct.unpack('2I', tlv_header)
+        if num_tlvs > MAX_TLVS or total_length > MAX_FRAME_BYTES:
+            _resync(data_port, f"implausible header (tlvs={num_tlvs}, frameLength={total_length})")
+            continue
 
-                if tlv_type == TLV_TARGET_LIST:
-                    num_targets = tlv_length // TRACK_SIZE_BYTES
-                    log.debug(f"Detected person: {num_targets} targets")
-                else:
-                    data_port.read(tlv_length)  # advance past payload to stay in sync
-            return frame_num, num_targets
+        num_targets = 0
+        targets = []
+        point_cloud = []
+        corrupted = None
+
+        for _ in range(num_tlvs):
+            tlv_header = data_port.read(8)
+            if len(tlv_header) < 8:
+                corrupted = "incomplete TLV header"
+                break
+            tlv_type, tlv_length = struct.unpack('2I', tlv_header)
+            if tlv_length > MAX_TLV_BYTES:
+                corrupted = f"implausible TLV length {tlv_length} (type {tlv_type})"
+                break
+            payload = data_port.read(tlv_length)
+            if len(payload) < tlv_length:
+                corrupted = f"incomplete TLV payload ({len(payload)}/{tlv_length} bytes)"
+                break
+
+            if tlv_type == TLV_TARGET_LIST:
+                num_targets = tlv_length // TRACK_SIZE_BYTES
+                log.debug(f"Detected persons: {num_targets} targets")
+                for i in range(num_targets):
+                    tid, posX, posY, posZ, velX, velY, velZ = struct.unpack_from(
+                        'I6f', payload, i * TRACK_SIZE_BYTES)
+                    # Same room-frame transform as the point cloud, so the track
+                    # circles line up with the points (velocity is a direction, so
+                    # it is only rotated, not height-shifted).
+                    px, py, pz = _to_room_frame(posX, posY, posZ)
+                    vx, vy, vz = _rotate(velX, velY, velZ)
+                    targets.append({
+                        "tid": tid,
+                        "posX": px, "posY": py, "posZ": pz,
+                        "velX": vx, "velY": vy, "velZ": vz,
+                    })
+
+            elif tlv_type == TLV_POINT_CLOUD:
+                num_points = (tlv_length - 20) // 8
+                elev_unit, azim_unit, dopp_unit, range_unit, snr_unit = struct.unpack_from('5f', payload, 0)
+                for i in range(num_points):
+                    elevation, azimuth, doppler, range_, snr = struct.unpack_from(
+                        '2bhHH', payload, 20 + i * 8)
+                    elev = elevation * elev_unit
+                    azim = azimuth * azim_unit
+                    r    = range_ * range_unit
+                    x, y, z = _to_room_frame(
+                        r * math.cos(elev) * math.sin(azim),
+                        r * math.cos(elev) * math.cos(azim),
+                        r * math.sin(elev),
+                    )
+                    point_cloud.append({
+                        "x": x, "y": y, "z": z,
+                        "doppler": doppler * dopp_unit,
+                        "snr": snr * snr_unit,
+                    })
+
+        if corrupted:
+            _resync(data_port, corrupted)
+            continue
+
+        return frame_num, num_targets, point_cloud, targets
 

@@ -17,6 +17,7 @@ from config import (
     WS_RECONNECT_DELAY, WS_MAX_RETRIES, BACKEND_WS_PATH,
     BACKEND_TLS, BACKEND_TLS_CA,
     SENSOR_MODE, SENSOR_ID, ROOM_ID, MOCK_ROOM_IDS,
+    USE_VISUALIZER, VISUALIZER_MAX_FPS,
 )
 from sensor.receiver import open_ports, send_config, read_frame, CONFIG_FILE
 from sensor.metrics import ThroughputMetrics, start_metrics_monitor
@@ -171,10 +172,28 @@ if __name__ == '__main__':
             log.info("Starting in REAL mode, reading from the mmWave sensor.")
             cfg_port, data_port = open_ports()
             send_config(cfg_port, CONFIG_FILE)
+
+            # The live view pulls in matplotlib, so only import it when actually
+            # enabled — keeps the headless/mock path free of GUI dependencies.
+            visualizer_update = None
+            if USE_VISUALIZER:
+                from visualizer.visualizer import start_visualizer, update as visualizer_update
+                start_visualizer()
+            render_interval = 1.0 / VISUALIZER_MAX_FPS
+            last_render = 0.0
+
             while True:
                 t_start = time.monotonic()
-                frame_num, people_count = read_frame(data_port)
+                frame_num, people_count, point_cloud, targets = read_frame(data_port)
                 enqueue_frame({"frameNum": frame_num, "numDetectedTracks": people_count})
+
+                # Throttled redraw: a full render can take longer than one sensor
+                # frame, and rendering every frame backs up the serial buffer until
+                # it overflows and the parser desyncs.
+                if visualizer_update is not None and t_start - last_render >= render_interval:
+                    visualizer_update(point_cloud, targets)
+                    last_render = t_start
+
                 latency = (time.monotonic() - t_start) * 1000  # ms
                 log.info(f"Frame {frame_num}: Detected {people_count} people | Latency: {latency:.1f}ms")
 
