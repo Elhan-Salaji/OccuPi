@@ -121,7 +121,7 @@ const AdminPanel = () => {
                             <th className="pb-3">Gebäude</th>
                             <th className="pb-3">Etage</th>
                             <th className="pb-3">Kapazität</th>
-                            <th className="pb-3">Actions</th>
+                            <th className="pb-3">Aktionen</th>
                         </tr>
                     </thead>
                     <tbody>
