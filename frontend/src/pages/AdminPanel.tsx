@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import { Pencil, Trash2 } from 'lucide-react';
 import api from '../utils/api';
 import { createRoom, updateRoom, deleteRoom} from "../utils/api";
@@ -14,6 +14,8 @@ const AdminPanel = () => {
     const [editingId, setEditingId] = useState<string | null>(null);
     const [showDeleteDialog, setShowDeleteDialog] = useState<string | null>(null);
 
+    const [initialized, setInitialized] = useState(false);
+
     const refreshRooms = useCallback (async () => {
         try {
             const res = await api.get<RoomResponse[]>('/rooms');
@@ -27,7 +29,10 @@ const AdminPanel = () => {
         }
     }, []);
 
-    useEffect(() => { void refreshRooms(); }, [refreshRooms]);
+    if (!initialized) {
+        setInitialized(true);
+        refreshRooms();
+    }
 
     return (
         <div className="p-6 space-y-8">
