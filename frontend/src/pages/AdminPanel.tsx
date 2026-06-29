@@ -19,14 +19,15 @@ const AdminPanel = () => {
             const res = await api.get<RoomResponse[]>('/rooms');
             setRooms(res.data);
             setError(null);
-        } catch (err: any) {
-            setError(err.response?.status === 403 ? 'Keine Berechtigung.' : 'Fehler beim Laden der Räume');
+        } catch (err: unknown) {
+            const status = (err as { response?: { status?: number }})?.response?.status;
+            setError(status === 403 ? 'Keine Berechtigung.' : 'Fehler beim Laden der Räume.');
         } finally {
             setLoading(false);
         }
     }, []);
 
-    useEffect(() => { refreshRooms(); }, [refreshRooms]);
+    useEffect(() => { void refreshRooms(); }, [refreshRooms]);
 
     return (
         <div className="p-6 space-y-8">
@@ -50,8 +51,9 @@ const AdminPanel = () => {
                         setFormData(emptyForm);
                         setEditingId(null);
                         await refreshRooms();
-                    } catch (err: any) {
-                        setError(err.response?.status === 403 ? 'Keine Berechtigung.' : 'Fehler beim Speichern');
+                    } catch (err: unknown) {
+                        const status = (err as { response?: { status?: number }})?.response?.status;
+                        setError(status === 403 ? 'Keine Berechtigung.' : 'Fehler beim Speichern.');
                     }
                 }}>
                     <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-4">
@@ -179,9 +181,9 @@ const AdminPanel = () => {
                                     await deleteRoom(showDeleteDialog!);
                                     setShowDeleteDialog(null);
                                     await refreshRooms();
-                                } catch (err: any) {
-                                    setError(err.response?.status === 403 ? 'Keine Berechtigung.' : 'Fehler beim Löschen.');
-                                    setShowDeleteDialog(null);
+                                } catch (err: unknown) {
+                                    const status = (err as { response?: { status?: number }})?.response?.status;
+                                    setError(status === 403 ? 'Keine Berechtigung.' : 'Fehler beim Löschen.');
                                 }
                             }}
                             className="px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg"
