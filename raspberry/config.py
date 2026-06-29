@@ -5,7 +5,7 @@ ROOM_ID   = os.getenv("ROOM_ID",   "room-01")
 SENSOR_ID = os.getenv("SENSOR_ID", "sensor-01")
 
 # --- Sensor Mode ---
-# "mock" generates realistic fake occupancy data (no hardware needed) — used by the
+# "mock" generates realistic fake occupancy data (no hardware needed), used by the
 # container and for local testing. "real" reads from the mmWave sensor over serial.
 # Flip this in one place: the SENSOR_MODE entry of your .env file.
 SENSOR_MODE = os.getenv("SENSOR_MODE", "mock").strip().lower()
@@ -29,6 +29,7 @@ BACKEND_HOST        = os.getenv("BACKEND_HOST",        "localhost")
 BACKEND_PORT        = int(os.getenv("BACKEND_PORT",    "8080"))
 BACKEND_WS_PATH     = os.getenv("BACKEND_WS_PATH",     "/ws")
 STOMP_DESTINATION   = os.getenv("STOMP_DESTINATION",   "/app/data")
+STOMP_METRICS_DESTINATION = os.getenv("STOMP_METRICS_DESTINATION", "/app/metrics")
 
 # Connect over TLS (wss) instead of plain ws. Needed to reach the production
 # backend through the Nginx endpoint (occupi.mi.hdm-stuttgart.de:443). Leave off
