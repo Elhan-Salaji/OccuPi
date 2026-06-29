@@ -1,12 +1,14 @@
 import { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, ChartColumn, DoorOpen, PanelLeftOpen, PanelLeftClose, LogOut } from 'lucide-react';
+import { LayoutDashboard, ChartColumn, DoorOpen, PanelLeftOpen, PanelLeftClose, LogOut, Shield } from 'lucide-react';
 import { useAuthStore} from "../hooks/useAuthStore";
 
 export const Sidebar = () => {
     const location = useLocation(); // reads the current location (link gets correspondingly highlighted in color)
 
     const navigate = useNavigate();
+
+    const user = useAuthStore((state) => state.user);
 
     // memory of sidebar state
     const [isCollapsed, setIsCollapsed] = useState(() => {
@@ -25,6 +27,8 @@ export const Sidebar = () => {
         { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
         { path: '/rooms', label: 'Räume', icon: DoorOpen },
         { path: '/analytics', label: 'Analytics', icon: ChartColumn },
+        //if admin
+        ...(user?.role === 'admin' ? [{ path: '/admin', label: 'Admin', icon: Shield}] : [])
     ];
 
     //switch for the pop-up (default: false = closed)

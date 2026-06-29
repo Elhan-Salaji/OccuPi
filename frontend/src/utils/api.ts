@@ -1,6 +1,6 @@
 import axios from 'axios';
 import { useAuthStore, TOKEN_ENDPOINT, CLIENT_ID } from "../hooks/useAuthStore";
-import type { ForecastResponse, HistoryResponse, WeekPatternResponse } from "../types/room";
+import type { ForecastResponse, HistoryResponse, WeekPatternResponse, RoomResponse } from "../types/room";
 
 const api = axios.create({
     baseURL: import.meta.env.VITE_API_URL,
@@ -86,6 +86,18 @@ export function fetchForecast(roomId: string, forecastHours: number = 12): Promi
 export function fetchWeekPattern(roomId: string, weeks: number = 8): Promise<WeekPatternResponse> {
     return api.get<WeekPatternResponse>('/occupancy/weekpattern',
         { params: { roomId, weeks } }).then(res => res.data);
+}
+
+export function createRoom(data: { roomId: string; name: string; building: string; floor: number; capacity: number}) {
+    return api.post<RoomResponse>('/rooms',data).then(res => res.data);
+}
+
+export function updateRoom(id: string, data: {roomId: string; name: string; building: string; floor: number; capacity: number})  {
+    return api.put<RoomResponse>(`/rooms/${id}`,data).then(res => res.data);
+}
+
+export function deleteRoom(id: string) {
+    return api.delete(`/rooms/${id}`)
 }
 
 export default api;
