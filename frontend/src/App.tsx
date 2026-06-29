@@ -4,7 +4,8 @@ import { Login } from './pages/Login';
 import Rooms from './pages/Rooms';
 import Analytics from './pages/Analytics';
 import { ProtectedRoute } from './components/ProtectedRoute';
-import { MainLayout } from './layouts/MainLayout.tsx';
+import { MainLayout } from './layouts/MainLayout';
+import AdminPanel from './pages/AdminPanel';
 
 function App() {
     // Auth state is restored synchronously when the store is created
@@ -24,6 +25,13 @@ function App() {
                         <Route path="/dashboard" element={<Dashboard />} />
                         <Route path="/rooms" element={<Rooms />} />
                         <Route path="/analytics" element={<Analytics />} />
+                    </Route>
+                </Route>
+
+                {/* admin routes */}
+                <Route element={<ProtectedRoute role="admin" />}>
+                    <Route element={<MainLayout />}>
+                        <Route path="/admin" element={<AdminPanel />} />
                     </Route>
                 </Route>
 
