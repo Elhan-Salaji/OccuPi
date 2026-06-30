@@ -38,6 +38,11 @@ MAX_TLVS = 16
 MAX_TLV_BYTES = 16384
 MAX_FRAME_BYTES = 65536
 
+# If this many unread bytes have piled up in the serial buffer, the parser has
+# fallen behind: drop the backlog and lock onto the latest frame instead of
+# working through stale ones, so end-to-end latency stays bounded.
+MAX_BACKLOG_BYTES = 32768
+
 
 def _read_sensor_mounting():
     """Reads sensorPosition (height, elevation tilt) from the chirp config so the
@@ -117,6 +122,12 @@ def _resync(data_port, reason: str) -> None:
 
 # Read the data from the data port, parse the frames, and extract the people count
 def read_frame(data_port):
+    # If the parser fell behind, stale frames have piled up in the OS serial
+    # buffer; drop them so we lock onto the most recent frame, not an old one.
+    if data_port.in_waiting > MAX_BACKLOG_BYTES:
+        log.warning(f"Serial backlog of {data_port.in_waiting} bytes, dropping to catch up.")
+        data_port.reset_input_buffer()
+
     window = bytearray()
     while True:
         byte = data_port.read(1)
@@ -148,23 +159,34 @@ def read_frame(data_port):
             _resync(data_port, f"implausible header (tlvs={num_tlvs}, frameLength={total_length})")
             continue
 
+        # Bulk-read the rest of the frame (all TLVs) in one go instead of one
+        # read() per TLV header and payload. total_length covers magic word (8) +
+        # header (32) + TLVs, so the remaining bytes are total_length - 40. Parsing
+        # then walks this in-memory buffer by an offset, far fewer serial reads,
+        # so the parser keeps up with the sensor and latency stops piling up.
+        payload_len = max(total_length - 40, 0)
+        frame_payload = data_port.read(payload_len)
+        if len(frame_payload) < payload_len:
+            _resync(data_port, f"incomplete frame payload ({len(frame_payload)}/{payload_len} bytes)")
+            continue
+
         num_targets = 0
         targets = []
         point_cloud = []
         corrupted = None
 
+        offset = 0
         for _ in range(num_tlvs):
-            tlv_header = data_port.read(8)
-            if len(tlv_header) < 8:
+            if offset + 8 > len(frame_payload):
                 corrupted = "incomplete TLV header"
                 break
-            tlv_type, tlv_length = struct.unpack('2I', tlv_header)
+            tlv_type, tlv_length = struct.unpack_from('2I', frame_payload, offset)
+            offset += 8
             if tlv_length > MAX_TLV_BYTES:
                 corrupted = f"implausible TLV length {tlv_length} (type {tlv_type})"
                 break
-            payload = data_port.read(tlv_length)
-            if len(payload) < tlv_length:
-                corrupted = f"incomplete TLV payload ({len(payload)}/{tlv_length} bytes)"
+            if offset + tlv_length > len(frame_payload):
+                corrupted = f"incomplete TLV payload ({len(frame_payload) - offset}/{tlv_length} bytes)"
                 break
 
             if tlv_type == TLV_TARGET_LIST:
@@ -172,7 +194,7 @@ def read_frame(data_port):
                 log.debug(f"Detected persons: {num_targets} targets")
                 for i in range(num_targets):
                     tid, posX, posY, posZ, velX, velY, velZ = struct.unpack_from(
-                        'I6f', payload, i * TRACK_SIZE_BYTES)
+                        'I6f', frame_payload, offset + i * TRACK_SIZE_BYTES)
                     # Same room-frame transform as the point cloud, so the track
                     # circles line up with the points (velocity is a direction, so
                     # it is only rotated, not height-shifted).
@@ -186,10 +208,10 @@ def read_frame(data_port):
 
             elif tlv_type == TLV_POINT_CLOUD:
                 num_points = (tlv_length - 20) // 8
-                elev_unit, azim_unit, dopp_unit, range_unit, snr_unit = struct.unpack_from('5f', payload, 0)
+                elev_unit, azim_unit, dopp_unit, range_unit, snr_unit = struct.unpack_from('5f', frame_payload, offset)
                 for i in range(num_points):
                     elevation, azimuth, doppler, range_, snr = struct.unpack_from(
-                        '2bhHH', payload, 20 + i * 8)
+                        '2bhHH', frame_payload, offset + 20 + i * 8)
                     elev = elevation * elev_unit
                     azim = azimuth * azim_unit
                     r    = range_ * range_unit
@@ -203,6 +225,8 @@ def read_frame(data_port):
                         "doppler": doppler * dopp_unit,
                         "snr": snr * snr_unit,
                     })
+
+            offset += tlv_length
 
         if corrupted:
             _resync(data_port, corrupted)

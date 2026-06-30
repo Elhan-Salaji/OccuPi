@@ -19,8 +19,8 @@ MOCK_MAX_STEP      = int(os.getenv("MOCK_MAX_STEP",        "2"))    # max headco
 MOCK_ROOM_IDS      = [r.strip() for r in os.getenv("MOCK_ROOM_IDS", "").split(",") if r.strip()]
 
 # --- Serial ---
-SERIAL_CFG_PORT  = os.getenv("SERIAL_CFG_PORT",  "/dev/tty.usbserial-010BCEBF0")
-SERIAL_DATA_PORT = os.getenv("SERIAL_DATA_PORT", "/dev/tty.usbserial-010BCEBF1")
+SERIAL_CFG_PORT  = os.getenv("SERIAL_CFG_PORT",  "/dev/ttyUSB0")
+SERIAL_DATA_PORT = os.getenv("SERIAL_DATA_PORT", "/dev/ttyUSB1")
 SERIAL_CFG_BAUD  = 115200
 SERIAL_DATA_BAUD = 921600
 
