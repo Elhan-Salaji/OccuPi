@@ -10,8 +10,9 @@ public interface ChartService {
 
     /**
      * Returns the occupancy history for a room over the last {@code hours}.
-     * Raw points are returned for short windows; longer windows are downsampled
-     * into fixed slots.
+     * Raw points are returned when the window holds at most
+     * {@code chart.history.max-points} readings; busier windows are downsampled
+     * into adaptively-sized slots so the series never exceeds that cap.
      *
      * @param roomId the room to query
      * @param hours  the look-back window in hours (must be &gt; 0)

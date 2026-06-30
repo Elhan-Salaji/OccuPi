@@ -43,13 +43,9 @@ public class ChartServiceImpl implements ChartService {
     @Value("${influxdb.measurement:occupancy}")
     private String measurement;
 
-    /** Windows up to this length return raw points; longer windows are downsampled. */
-    @Value("${chart.history.downsample-threshold-hours:24}")
-    private int downsampleThresholdHours;
-
-    /** Slot width used when downsampling a long history window. */
-    @Value("${chart.history.slot-minutes:30}")
-    private int slotMinutes;
+    /** Hard cap on the number of points {@code GET /api/occupancy/history} returns. */
+    @Value("${chart.history.max-points:500}")
+    private int maxPoints;
 
     /** Earliest hour (inclusive) considered when picking the quiet time. */
     @Value("${chart.weekpattern.quiet-start-hour:8}")
@@ -76,12 +72,12 @@ public class ChartServiceImpl implements ChartService {
 
         List<Object[]> rows = queryReadings(roomId, start, end, "\"count\", \"confidence\", time");
 
-        List<HistoryPoint> points = hours <= downsampleThresholdHours
+        List<HistoryPoint> points = rows.size() <= maxPoints
                 ? toRawPoints(rows)
-                : toDownsampledPoints(rows);
+                : toDownsampledPoints(rows, slotMinutesFor(hours));
 
         log.debug("History for room={} window={}h: rows={} points={} downsampled={}",
-                roomId, hours, rows.size(), points.size(), hours > downsampleThresholdHours);
+                roomId, hours, rows.size(), points.size(), rows.size() > maxPoints);
 
         return new HistoryResponse(roomId, points, start, end);
     }
@@ -145,8 +141,9 @@ public class ChartServiceImpl implements ChartService {
     }
 
     /**
-     * Returns one {@link HistoryPoint} per reading, untouched. Used for short
-     * windows where the raw resolution is already small enough for the client.
+     * Returns one {@link HistoryPoint} per reading, untouched. Used when the window
+     * holds at most {@link #maxPoints} readings, i.e. the raw resolution already
+     * fits within the cap.
      */
     private List<HistoryPoint> toRawPoints(List<Object[]> rows) {
         List<HistoryPoint> points = new ArrayList<>(rows.size());
@@ -162,10 +159,10 @@ public class ChartServiceImpl implements ChartService {
     }
 
     /**
-     * Aggregates readings into fixed {@link #slotMinutes}-wide slots (count and
-     * confidence averaged), so a long window doesn't ship thousands of points.
+     * Aggregates readings into fixed {@code slotMinutes}-wide slots (count and
+     * confidence averaged), so a busy window doesn't ship thousands of points.
      */
-    private List<HistoryPoint> toDownsampledPoints(List<Object[]> rows) {
+    private List<HistoryPoint> toDownsampledPoints(List<Object[]> rows, int slotMinutes) {
         long slotSeconds = slotMinutes * 60L;
         // slot start (epoch seconds) → [sumCount, sumConfidence, sampleCount]
         Map<Long, double[]> slots = new LinkedHashMap<>();
@@ -194,6 +191,19 @@ public class ChartServiceImpl implements ChartService {
                     return new HistoryPoint(Instant.ofEpochSecond(e.getKey()), avgCount, avgConfidence);
                 })
                 .toList();
+    }
+
+    /**
+     * Picks the slot width (minutes) for downsampling from the window length, so the
+     * returned series stays at or below {@link #maxPoints} regardless of the sensor's
+     * write rate. Targets {@code maxPoints - 1} full slots; because the window edges
+     * are not aligned to the slot grid, at most one extra partial slot can appear,
+     * keeping the total within the cap.
+     */
+    private int slotMinutesFor(int hours) {
+        long windowMinutes = (long) hours * 60L;
+        long targetSlots = Math.max(1L, maxPoints - 1L);
+        return (int) Math.max(1L, (long) Math.ceil((double) windowMinutes / targetSlots));
     }
 
     private WeekPatternExtreme toExtreme(WeekPatternSlot slot) {
