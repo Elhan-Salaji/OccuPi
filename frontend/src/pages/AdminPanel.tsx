@@ -47,6 +47,20 @@ const AdminPanel = () => {
                 </h2>
                 <form onSubmit={async (e) => {
                     e.preventDefault();
+                    if (!formData.roomId.trim()){
+                        setError('Raum-ID ist erforderlich.')
+                        return;
+                    }
+
+                    if (!formData.name.trim()){
+                        setError('Name ist erforderlich.')
+                        return;
+                    }
+
+                    if (formData.capacity < 1){
+                        setError('Kapazität muss mindestens 1 sein.')
+                        return;
+                    }
                     try {
                         if (editingId) {
                             await updateRoom(editingId, formData);
@@ -58,7 +72,9 @@ const AdminPanel = () => {
                         await refreshRooms();
                     } catch (err: unknown) {
                         const status = (err as { response?: { status?: number }})?.response?.status;
-                        setError(status === 403 ? 'Keine Berechtigung.' : 'Fehler beim Speichern.');
+                        setError(
+                            status === 403 ? 'Keine Berechtigung.'  :
+                            status === 409 ? 'Raum-ID existiert bereits.' : 'Fehler beim Speichern.');
                     }
                 }}>
                     <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-4">
@@ -66,8 +82,13 @@ const AdminPanel = () => {
                             type="text"
                             placeholder="Raum-ID"
                             value={formData.roomId}
-                            onChange={(e) => setFormData({...formData, roomId: e.target.value})}
+                            onChange={(e) => {
+                                e.target.setCustomValidity('');
+                                setFormData({...formData, roomId: e.target.value});
+                            }}
+                            onInvalid={(e) => (e.target as HTMLInputElement).setCustomValidity('Man Rafa.')}
                             disabled={editingId !== null}
+                            required
                             className="border border-gray-300 rounded-lg px-3 py-2 text-sm disabled:bg-gray-100"
                         />
 
@@ -75,7 +96,12 @@ const AdminPanel = () => {
                             type="text"
                             placeholder="Name"
                             value={formData.name}
-                            onChange={(e) => setFormData({...formData, name: e.target.value})}
+                            onChange={(e) => {
+                                e.target.setCustomValidity('');
+                                setFormData({...formData, name: e.target.value});
+                            }}
+                            onInvalid={(e) => (e.target as HTMLInputElement).setCustomValidity('Name ist erforderlich.')}
+                            required
                             className="border border-gray-300 rounded-lg px-3 py-2 text-sm disabled:bg-gray-100"
                         />
 
@@ -99,7 +125,13 @@ const AdminPanel = () => {
                             type="number"
                             placeholder="Kapazität (z.B. 50)"
                             value={formData.capacity || ''}
-                            onChange={(e) => setFormData({...formData, capacity: Number(e.target.value)})}
+                            onChange={(e) => {
+                                e.target.setCustomValidity('');
+                                setFormData({...formData, capacity: Number(e.target.value)});
+                            }}
+                            onInvalid={(e) => (e.target as HTMLInputElement).setCustomValidity('Man Elhan.')}
+                            min="1"
+                            required
                             className="border border-gray-300 rounded-lg px-3 py-2 text-sm disabled:bg-gray-100"
                         />
                     </div>
@@ -152,11 +184,11 @@ const AdminPanel = () => {
                         <td className="py-3 flex gap-2">
                             <button onClick={() => { setFormData(room);
                             setEditingId(room.roomId); }}
-                                className="p-1.5 text-gray-500 hover:text-blue-600">
+                                className="p-1.5 rounded-full text-gray-500 hover:text-blue-600 hover:bg-blue-50 transition-colors">
                                 <Pencil size={16} />
                             </button>
                             <button onClick={() => setShowDeleteDialog(room.roomId)}
-                                    className="p-1.5 text-gray-500 hover:text-red-600">
+                                    className="p-1.5 rounded-full text-gray-500 hover:text-red-600 hover:bg-red-50 transition-colors">
                                 <Trash2 size={16} />
                             </button>
                         </td>
