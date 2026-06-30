@@ -53,8 +53,8 @@ export interface WeekPatternResponse {
     roomId: string;
     weeks: number;
     pattern: WeekPatternSlot[];
-    peakTime: TimeSlotSummary;
-    quietTime: TimeSlotSummary;
+    peakTime: TimeSlotSummary | null;
+    quietTime: TimeSlotSummary | null;
 }
 
 export interface Room {
