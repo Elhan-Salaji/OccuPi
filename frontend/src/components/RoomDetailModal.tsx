@@ -3,6 +3,7 @@ import type { Room, HistoryResponse, ForecastResponse, WeekPatternResponse } fro
 import { fetchForecast, fetchHistory, fetchWeekPattern } from "../utils/api";
 import { OccupancyChart } from "./OccupancyChart";
 import { WeekPatternHeatmap } from "./WeekPatternHeatmap"
+import { useRoomStore} from "../hooks/useRoomStore";
 
 interface RoomDetailModalProps {
   room: Room;
@@ -15,6 +16,7 @@ export const RoomDetailModal = ({room, isOpen, onClose}: RoomDetailModalProps) =
     const [forecast, setForecast] = useState<ForecastResponse | null>(null);
     const [weekPattern, setWeekPattern] = useState<WeekPatternResponse | null>(null);
     const [timeRange, setTimeRange] = useState(24);
+    const liveRoom = useRoomStore(state => state.rooms.find(r => r.roomId === room.roomId)) ?? room;
 
     useEffect(() => {
         if (!isOpen) return;
@@ -58,11 +60,11 @@ export const RoomDetailModal = ({room, isOpen, onClose}: RoomDetailModalProps) =
                 <div className="grid grid-cols-2 gap-4 mb-6">
                     <div className="bg-gray-50 rounded-lg p-4">
                         <p className="text-sm text-gray-500">Aktuelle Belegung</p>
-                        <p className="text-2xl font-bold">{room.count} <span className="text-sm font-normal text-gray-400"> /{room.capacity}</span></p>
+                        <p className="text-2xl font-bold">{liveRoom.count} <span className="text-sm font-normal text-gray-400"> /{liveRoom.capacity}</span></p>
                     </div>
                     <div className="bg-gray-50 rounded-lg p-4">
                         <p className="text-sm text-gray-500">Auslastung</p>
-                        <p className="text-2xl font-bold">{room.capacity > 0 ? Math.round(room.count / room.capacity * 100) : 0}%</p>
+                        <p className="text-2xl font-bold">{liveRoom.capacity > 0 ? Math.round(liveRoom.count / liveRoom.capacity * 100) : 0}%</p>
                     </div>
                 </div>
 
