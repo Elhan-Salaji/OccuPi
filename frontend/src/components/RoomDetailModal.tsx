@@ -4,6 +4,8 @@ import { fetchForecast, fetchHistory, fetchWeekPattern } from "../utils/api";
 import { OccupancyChart } from "./OccupancyChart";
 import { WeekPatternHeatmap } from "./WeekPatternHeatmap"
 import { useRoomStore} from "../hooks/useRoomStore";
+import { Clock } from 'lucide-react';
+import { ErrorBoundary} from "./ErrorBoundary";
 
 interface RoomDetailModalProps {
   room: Room;
@@ -69,31 +71,41 @@ export const RoomDetailModal = ({room, isOpen, onClose}: RoomDetailModalProps) =
                 </div>
 
                 {/* Occupancy Chart */}
-                {history && forecast && (
-                    <div className="mb-6">
-                        <div className="flex items-center justify-between mb-2">
-                            <h3 className="text-lg font-semibold"> Verlauf & Prognose</h3>
-                            <div className="flex gap-1">
-                                {[1, 3, 12, 24, 168].map(h => (
-                                    <button key={h} onClick={() => setTimeRange(h)}
-                                    className={`px-3 py-1 text-sm rounded-lg ${timeRange === h ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
-                                        {h === 168 ? '1W' : `${h}h`}
-                                    </button>
-                                ))}
+                <ErrorBoundary>
+                    {history && forecast && (
+                        <div className="mb-6">
+                            <div className="flex items-center justify-between mb-2">
+                                <h3 className="text-lg font-semibold"> Verlauf & Prognose</h3>
+                                <div className="flex gap-1">
+                                    {[1, 3, 12, 24, 168].map(h => (
+                                        <button key={h} onClick={() => setTimeRange(h)}
+                                        className={`px-3 py-1 text-sm rounded-lg ${timeRange === h ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
+                                            {h === 168 ? '1W' : `${h}h`}
+                                        </button>
+                                    ))}
+                                </div>
                             </div>
+                            <OccupancyChart historyPoints={history.points} forecastPoints={forecast.forecast} capacity={room.capacity} />
+                            {forecast.forecast.length === 0 ? (
+                                <p className="text-sm text-gray-400 mt-1 flex items-center gap-1">
+                                    <Clock className="w-4 h-4"/> Prognose benötigt mehr Daten
+                                </p>
+                            ) : (
+                            <p className="text-sm text-gray-400 mt-1">Backend-Forecast · Konfidenz {Math.round(forecast.confidence * 100)}%</p>
+                                )}
                         </div>
-                        <OccupancyChart historyPoints={history.points} forecastPoints={forecast.forecast} capacity={room.capacity} />
-                        <p className="text-sm text-gray-400 mt-1">Backend-Forecast · Konfidenz {Math.round(forecast.confidence * 100)}%</p>
-                    </div>
-                )}
+                    )}
+                </ErrorBoundary>
 
                 {/* Weekly Pattern Heatmap */}
-                {weekPattern && (
-                    <div>
-                        <h3 className="text-lg font-semibold mb-2"> Wochenmuster (Ø der letzten {weekPattern.weeks} Wochen)</h3>
-                        <WeekPatternHeatmap pattern={weekPattern.pattern} peakTime={weekPattern.peakTime} quietTime={weekPattern.quietTime} />
-                    </div>
-                )}
+                <ErrorBoundary>
+                    {weekPattern && (
+                        <div>
+                            <h3 className="text-lg font-semibold mb-2"> Wochenmuster (Ø der letzten {weekPattern.weeks} Wochen)</h3>
+                            <WeekPatternHeatmap pattern={weekPattern.pattern} peakTime={weekPattern.peakTime} quietTime={weekPattern.quietTime} />
+                        </div>
+                    )}
+                </ErrorBoundary>
 
 
             </div>
