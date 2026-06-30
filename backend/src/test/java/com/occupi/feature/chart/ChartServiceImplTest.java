@@ -21,6 +21,7 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -60,8 +61,7 @@ class ChartServiceImplTest {
     void setUp() {
         service = new ChartServiceImpl(influxDBClient, roomService);
         ReflectionTestUtils.setField(service, "measurement", "occupancy");
-        ReflectionTestUtils.setField(service, "downsampleThresholdHours", 24);
-        ReflectionTestUtils.setField(service, "slotMinutes", 30);
+        ReflectionTestUtils.setField(service, "maxPoints", 500);
         ReflectionTestUtils.setField(service, "quietStartHour", 8);
         ReflectionTestUtils.setField(service, "quietEndHour", 18);
     }
@@ -69,8 +69,8 @@ class ChartServiceImplTest {
     // ---------- history ----------
 
     @Test
-    @DisplayName("history returns raw points unchanged for windows within the threshold")
-    void getHistory_shortWindow_returnsRawPoints() {
+    @DisplayName("history returns raw points unchanged when the readings fit within the cap")
+    void getHistory_readingsWithinCap_returnsRawPoints() {
         Instant t1 = Instant.parse("2025-01-13T10:00:00Z");
         Instant t2 = Instant.parse("2025-01-13T10:05:00Z");
         when(influxDBClient.query(anyString(), any(QueryOptions.class)))
@@ -90,10 +90,13 @@ class ChartServiceImplTest {
     }
 
     @Test
-    @DisplayName("history downsamples long windows into averaged slots")
-    void getHistory_longWindow_downsamplesIntoSlots() {
-        // three readings in the same 30-min slot [10:00,10:30) → avg count 20,
-        // one reading in the next aligned slot [11:00,11:30) → count 8
+    @DisplayName("history downsamples into averaged slots once the readings exceed the cap")
+    void getHistory_moreReadingsThanCap_downsamplesIntoSlots() {
+        // A cap of 3 with 4 readings forces the downsample branch. For a 1h window
+        // the adaptive slot width is slotMinutesFor(1) = ceil(60 / (3 - 1)) = 30 min,
+        // so the readings fall into the same epoch-aligned 30-min slots as before:
+        //   three readings in [10:00,10:30) → avg count 20, one in [11:00,11:30) → 8.
+        ReflectionTestUtils.setField(service, "maxPoints", 3);
         Instant a = Instant.parse("2025-01-13T10:00:00Z");
         Instant b = Instant.parse("2025-01-13T10:10:00Z");
         Instant c = Instant.parse("2025-01-13T10:20:00Z");
@@ -105,14 +108,36 @@ class ChartServiceImplTest {
                         new Object[]{30, 0.9, nanos(c)},
                         new Object[]{8, 0.9, nanos(d)}));
 
-        HistoryResponse response = service.getHistory("room-1", 48);
+        HistoryResponse response = service.getHistory("room-1", 1);
 
+        assertThat(response.points()).hasSizeLessThanOrEqualTo(3);
         assertThat(response.points()).hasSize(2);
         assertThat(response.points().get(0).time()).isEqualTo(Instant.parse("2025-01-13T10:00:00Z"));
         assertThat(response.points().get(0).count()).isEqualTo(20);
         assertThat(response.points().get(0).confidence()).isCloseTo(0.9, within(1e-9));
         assertThat(response.points().get(1).time()).isEqualTo(Instant.parse("2025-01-13T11:00:00Z"));
         assertThat(response.points().get(1).count()).isEqualTo(8);
+    }
+
+    @Test
+    @DisplayName("history never returns more than max-points, however dense the window")
+    void getHistory_denseWindow_neverExceedsMaxPoints() {
+        int cap = 10;
+        ReflectionTestUtils.setField(service, "maxPoints", cap);
+        // One reading every 5 minutes across a full week → 2016 readings, far above
+        // the cap and all within the 168h window.
+        Instant base = Instant.parse("2025-01-13T00:00:00Z");
+        List<Object[]> readings = IntStream.range(0, 2016)
+                .mapToObj(i -> new Object[]{i % 50, 0.9, nanos(base.plusSeconds(i * 300L))})
+                .toList();
+        when(influxDBClient.query(anyString(), any(QueryOptions.class)))
+                .thenAnswer(inv -> readings.stream());
+
+        HistoryResponse response = service.getHistory("room-1", 168);
+
+        assertThat(response.points()).isNotEmpty();
+        assertThat(response.points()).hasSizeLessThanOrEqualTo(cap);
+        assertThat(response.points().size()).isLessThan(readings.size());
     }
 
     @Test
