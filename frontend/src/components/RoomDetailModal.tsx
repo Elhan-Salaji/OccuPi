@@ -31,6 +31,14 @@ export const RoomDetailModal = ({room, isOpen, onClose}: RoomDetailModalProps) =
         return () => document.removeEventListener('keydown', handleEsc);
     }, [onClose]);
 
+    useEffect(() => {
+        if (!isOpen) return;
+        document.body.style.overflow = 'hidden';
+        return () => {
+            document.body.style.overflow = '';
+        };
+    }, [isOpen]);
+
     if (!isOpen) return null;
 
     return (
