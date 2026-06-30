@@ -3,8 +3,8 @@ import type { WeekPatternSlot, TimeSlotSummary} from "../types/room";
 
 interface WeekPattern {
     pattern: WeekPatternSlot[];
-    peakTime: TimeSlotSummary;
-    quietTime: TimeSlotSummary;
+    peakTime: TimeSlotSummary | null;
+    quietTime: TimeSlotSummary | null;
 }
 
 export const WeekPatternHeatmap = ({ pattern, peakTime, quietTime}: WeekPattern) => {
@@ -45,17 +45,33 @@ export const WeekPatternHeatmap = ({ pattern, peakTime, quietTime}: WeekPattern)
                     </React.Fragment>
                 ))}
             </div>
+
             <div className="grid grid-cols-2 gap-4 mt-4">
+                {peakTime ? (
                 <div className="bg-red-50 rounded-lg p-4">
                     <p className="text-sm text-gray-500">Stoßzeit</p>
                     <p className="text-lg font-bold text-red-600">{dayLabels[peakTime.dayOfWeek]} {peakTime.hour}:00</p>
                     <p className="text-sm text-gray-400">{Math.round(peakTime.avgRate * 100)}% Auslastung</p>
                 </div>
+                ) : (
+                <div className="bg-gray-50 rounded-lg p-4">
+                    <p className="text-sm text-gray-500">Stoßzeit</p>
+                    <p className="text-sm text-gray-400">Noch nicht genügend Daten</p>
+                </div>
+                )}
+
+                {quietTime ? (
                 <div className="bg-green-50 rounded-lg p-4">
                     <p className="text-sm text-gray-500"> Beste Zeit (8-18 Uhr)</p>
                     <p className="text-lg font-bold text-green-600">{dayLabels[quietTime.dayOfWeek]} {quietTime.hour}:00</p>
                     <p className="text-sm text-gray-400">{Math.round(quietTime.avgRate * 100)}%</p>
                 </div>
+                ) : (
+                    <div className="bg-gray-50 rounded-lg p-4">
+                        <p className="text-sm text-gray-500">Beste Zeit (8-18 Uhr)</p>
+                        <p className="text-sm text-gray-400">Noch nicht genügend Daten</p>
+                    </div>
+                )}
             </div>
         </>
 
