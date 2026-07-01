@@ -3,6 +3,7 @@ import {StatusBadge} from '../components/RoomStatus';
 import {useState} from "react";
 import {useFetchRooms} from '../hooks/useFetchRooms';
 import {RoomDetailModal} from "../components/RoomDetailModal";
+import {PinButton} from "../components/PinButton";
 import type {Room} from '../types/room'
 import {RoomFilters} from "../components/RoomFilters";
 
@@ -48,8 +49,9 @@ export default function Analytics() {
     const totalCapacity = filteredRooms.reduce((sum, r) => sum + r.capacity, 0);
     const totalPeople = filteredRooms.reduce((sum, r) => sum + r.count, 0);
     const occupancyPct = totalCapacity > 0 ? Math.round((totalPeople / totalCapacity) * 100) : 0;
+    const occupancyUnavailable = rooms.some((r) => r.occupancyRate === 'unknown');
 
-    const columns = ['Raum', 'Gebäude', 'Etage', 'Belegung', 'Auslastung'];
+    const columns = ['Raum', 'Gebäude', 'Etage', 'Belegung', 'Auslastung', 'Pin'];
 
     return (
         <div className="max-w-7xl mx-auto">
@@ -61,8 +63,8 @@ export default function Analytics() {
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
                 <SummaryCard label="Räume" value={totalRooms}/>
                 <SummaryCard label="Kapazität" value={totalCapacity}/>
-                <SummaryCard label="Personen anwesend" value={totalPeople}/>
-                <SummaryCard label="Auslastung" value={`${occupancyPct}%`}/>
+                <SummaryCard label="Personen anwesend" value={occupancyUnavailable ? '—' : totalPeople}/>
+                <SummaryCard label="Auslastung" value={occupancyUnavailable ? '—' : `${occupancyPct}%`}/>
             </div>
 
             {/* new componoent for room filters*/}
@@ -102,9 +104,12 @@ export default function Analytics() {
                             </td>
                             <td className="px-4 py-3 text-sm text-gray-600">{room.building}</td>
                             <td className="px-4 py-3 text-sm text-gray-600">{room.floor}</td>
-                            <td className="px-4 py-3 text-sm text-gray-600">{room.count} / {room.capacity}</td>
+                            <td className="px-4 py-3 text-sm text-gray-600">{room.occupancyRate === 'unknown' ? '—' : `${room.count} / ${room.capacity}`}</td>
                             <td className="px-4 py-3 text-sm">
                                 <StatusBadge occupancyRate={room.occupancyRate}/>
+                            </td>
+                            <td className="px-4 py-3">
+                                <PinButton roomId={room.roomId} />
                             </td>
                         </tr>
                     ))}

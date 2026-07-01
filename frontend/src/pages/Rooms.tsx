@@ -3,6 +3,7 @@ import { useRoomStore } from '../hooks/useRoomStore';
 import { StatusBadge, OccupancyBar } from '../components/RoomStatus';
 import { RoomDetailModal} from "../components/RoomDetailModal";
 import { useFetchRooms } from '../hooks/useFetchRooms';
+import { PinButton } from "../components/PinButton";
 import type { Room } from '../types/room';
 import React from 'react';
 
@@ -10,7 +11,7 @@ const columns: { label: string; render: (r: Room) => React.ReactNode }[] = [
     {label: 'Raum', render: (r) => r.name },
     {label: 'Gebäude', render: (r) => r.building},
     {label: 'Etage', render: (r) => String(r.floor) },
-    {label: 'Belegung', render: (r) => <OccupancyBar count={r.count} capacity={r.capacity} /> },
+    {label: 'Belegung', render: (r) => <OccupancyBar count={r.count} capacity={r.capacity} unavailable={r.occupancyRate === 'unknown'} /> },
     {label: 'Auslastung', render: (r) => <StatusBadge occupancyRate={r.occupancyRate}/> },
     {label: 'Aktualisiert', render: (r) => formatTime(r.timestamp) },
 
@@ -64,6 +65,7 @@ export default function Rooms(){
                                 {col.label}
                             </th>
                         ))}
+                        <th className="text-left px-4 py-3 text-sm font-medium text-gray-600">Pin</th>
                     </tr>
                     </thead>
                     <tbody>
@@ -76,6 +78,9 @@ export default function Rooms(){
 
                                         </td>
                                     ))}
+                                <td className="px-4 py-3">
+                                    <PinButton roomId={room.roomId} />
+                                </td>
                             </tr>
                         ))}
                     </tbody>

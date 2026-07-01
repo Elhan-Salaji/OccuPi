@@ -107,4 +107,25 @@ class OccupancyInfluxIntegrationTest {
                             .contains("itroom-b1", "itroom-b2");
                 });
     }
+
+    @Test
+    @DisplayName("findAllLatest ignores rooms whose last reading is older than the lookback window")
+    void findAllLatestExcludesStaleRooms() {
+        // Well outside the default 7-day lookback — the row that used to force a
+        // full-history scan (#273) and must no longer surface in the latest view.
+        Instant stale = Instant.now().minus(400, ChronoUnit.DAYS);
+        repository.save(OccupancyData.builder()
+                .roomId("stale-room").sensorId("s").count(7).confidence(0.5).timestamp(stale).build());
+
+        Instant fresh = Instant.now().truncatedTo(ChronoUnit.MILLIS);
+        repository.save(OccupancyData.builder()
+                .roomId("fresh-room").sensorId("s").count(4).confidence(0.9).timestamp(fresh).build());
+
+        await().atMost(Duration.ofSeconds(15)).pollInterval(Duration.ofMillis(500))
+                .untilAsserted(() -> {
+                    List<OccupancyData> all = repository.findAllLatest();
+                    assertThat(all).extracting(OccupancyData::getRoomId).contains("fresh-room");
+                    assertThat(all).extracting(OccupancyData::getRoomId).doesNotContain("stale-room");
+                });
+    }
 }

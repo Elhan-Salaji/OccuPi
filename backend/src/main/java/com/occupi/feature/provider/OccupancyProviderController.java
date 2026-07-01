@@ -37,9 +37,6 @@ public class OccupancyProviderController {
      */
     @GetMapping
     public ResponseEntity<OccupancyResponse> getOccupancy(@RequestParam String roomId) {
-        if (roomId == null || roomId.isBlank()) {
-            return ResponseEntity.badRequest().build();
-        }
         return providerService.getLatestForRoom(roomId)
                 .map(ResponseEntity::ok)
                 .orElseGet(() -> ResponseEntity.notFound().build());

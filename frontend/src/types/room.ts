@@ -9,12 +9,12 @@ export interface Occupancy{
 
 export interface ForecastPoint {
     time: string;
-    predictedCount: number;
+    predictedCount: number | null;
 }
 
 export interface HistoryPoint {
     time: string;
-    count: number;
+    count: number | null;
     confidence: number;
 }
 
@@ -66,7 +66,7 @@ export interface Room {
     count: number; // How many people are in the room?
     confidence: number;
     timestamp: string; //
-    occupancyRate: 'low' | 'medium' | 'high'; // status
+    occupancyRate: 'low' | 'medium' | 'high' | 'unknown'; // status
 }
 
 export interface RoomResponse {
