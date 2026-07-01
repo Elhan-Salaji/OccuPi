@@ -146,7 +146,7 @@ export const RoomDetailModal = ({room, isOpen, onClose}: RoomDetailModalProps) =
                                         <h3 className="text-lg font-semibold"> Verlauf & Prognose</h3>
                                         <div className="flex gap-1">
                                             {[1, 3, 12, 24, 168].map(h => (
-                                                <button key={h} onClick={() => { setIsLoading(true); setTimeRange(h); }}
+                                                <button key={h} onClick={() =>  setTimeRange(h)}
                                                 className={`px-3 py-1 text-sm rounded-lg ${timeRange === h ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
                                                     {h === 168 ? '1W' : `${h}h`}
                                                 </button>
