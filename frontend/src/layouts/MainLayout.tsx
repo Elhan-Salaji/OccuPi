@@ -2,9 +2,11 @@ import { Outlet } from 'react-router-dom';
 import { Sidebar } from '../components/Sidebar';
 import { Navbar } from '../components/Navbar';
 import { useWebSocket } from '../hooks/useWebSocket';
+import { useFetchRooms } from "../hooks/useFetchRooms";
 
 export const MainLayout = () => {
     useWebSocket();
+    useFetchRooms()
     return (
         <div className="h-screen flex bg-[#F3F4F6] text-[#1F2937] font-sans overflow-hidden">
 
