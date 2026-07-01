@@ -78,6 +78,16 @@ class RoomServiceImplTest {
     }
 
     @Test
+    @DisplayName("createRoom throws RoomAlreadyExistsException for a duplicate roomId")
+    void createRoom_duplicate_throws() {
+        when(roomRepository.existsById("room-9")).thenReturn(true);
+
+        assertThatThrownBy(() -> service.createRoom(request("room-9")))
+                .isInstanceOf(RoomAlreadyExistsException.class);
+        verify(roomRepository, never()).save(any());
+    }
+
+    @Test
     @DisplayName("updateRoom updates fields of an existing room")
     void updateRoom_existing() {
         when(roomRepository.findById("room-1")).thenReturn(Optional.of(room("room-1")));

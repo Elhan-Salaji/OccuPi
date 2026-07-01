@@ -65,6 +65,17 @@ class RoomControllerValidationTest {
     }
 
     @Test
+    void createRoom_withExistingId_returns409() throws Exception {
+        RoomRequest request = new RoomRequest("room-1", "Room One", "BuildingA", 1, 10);
+        when(roomService.createRoom(any())).thenThrow(new RoomAlreadyExistsException("room-1"));
+
+        mockMvc.perform(post("/api/rooms")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isConflict());
+    }
+
+    @Test
     void getRoom_withUnknownId_returns404() throws Exception {
         when(roomService.getRoom("unknown")).thenReturn(Optional.empty());
 
