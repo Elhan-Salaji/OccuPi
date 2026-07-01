@@ -33,6 +33,9 @@ public class RoomServiceImpl implements RoomService {
 
     @Override
     public RoomResponse createRoom(RoomRequest request) {
+        if (roomRepository.existsById(request.roomId())) {
+            throw new RoomAlreadyExistsException(request.roomId());
+        }
         Room room = Room.builder()
                 .roomId(request.roomId())
                 .name(request.name())

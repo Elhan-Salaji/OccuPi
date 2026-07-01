@@ -34,6 +34,11 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   computation, with short per-endpoint TTLs and a bounded cache size (#280).
 
 ### Fixed
+- `POST /api/rooms` now rejects a create whose `roomId` already exists with
+  `409 Conflict` instead of silently overwriting the stored room. Rooms use an
+  assigned ID, so `save()` on a duplicate acted as an update and corrupted the
+  existing room's metadata; the admin panel already shows "Raum-ID existiert
+  bereits." for the 409 (#248).
 - The "latest per room / per sensor" reads no longer scan the entire InfluxDB history
   on every call. The window-function queries in `OccupancyRepository.findAllLatest`
   and `MetricsRepository.findAllLatest` are now bounded to a configurable recent
