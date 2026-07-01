@@ -7,9 +7,11 @@ import com.occupi.feature.database.InfluxTime;
 import com.occupi.feature.database.model.OccupancyData;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Repository;
 
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -27,6 +29,16 @@ public class OccupancyRepository {
     static final String MEASUREMENT_NAME = "occupancy";
 
     private final InfluxDBClient influxDBClient;
+
+    /**
+     * How many days back {@link #findAllLatest()} scans for the newest row per room.
+     * The scan MUST be bounded: without a time predicate InfluxDB reads the whole
+     * measurement history and sorts it on every call, which pegged the single-core
+     * server CPU once a large amount of data had accumulated (#273). A room that has
+     * been silent longer than this window simply won't appear until it reports again.
+     */
+    @Value("${occupancy.latest-lookback-days:7}")
+    private int latestLookbackDays = 7;
 
     /**
      * Saves a single occupancy measurement to InfluxDB.
@@ -94,20 +106,25 @@ public class OccupancyRepository {
 
     /**
      * Returns the most recent occupancy measurement for every known room.
-     * Uses a window function to pick the latest row per roomId in a single query.
+     * Uses a window function to pick the latest row per roomId in a single query,
+     * scanning only the last {@link #latestLookbackDays} days so the query stays
+     * cheap regardless of how much history has accumulated (see #273).
      *
-     * @return one latest measurement per room (empty list if no data exists)
+     * @return one latest measurement per room within the lookback window
+     *         (empty list if no room has reported in that window)
      */
     public List<OccupancyData> findAllLatest() {
+        Instant since = Instant.now().minus(latestLookbackDays, ChronoUnit.DAYS);
         String sql = """
                 SELECT "roomId", "sensorId", "count", "confidence", time
                 FROM (
                     SELECT "roomId", "sensorId", "count", "confidence", time,
                            ROW_NUMBER() OVER (PARTITION BY "roomId" ORDER BY time DESC) AS rn
                     FROM "%s"
+                    WHERE time >= '%s'
                 )
                 WHERE rn = 1
-                """.formatted(MEASUREMENT_NAME);
+                """.formatted(MEASUREMENT_NAME, since);
 
         List<OccupancyData> result = new ArrayList<>();
         try (Stream<Object[]> rows = influxDBClient.query(sql, QueryOptions.defaultQueryOptions())) {
