@@ -25,6 +25,13 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   disconnects, so this cap is the backstop that keeps the box reachable. Auto-deploy
   only recreates backend/frontend, so applying it needs a manual
   `docker compose ... up -d influxdb` (#273).
+- The room-detail reads (`GET /api/occupancy/history`, `/api/forecast`,
+  `/api/occupancy/weekpattern`) are now cached in memory (Caffeine), keyed by room and
+  window. Opening a room or switching the hour filter re-ran all three — including a full
+  8-week week-pattern scan and the forecast's four lookback queries — every time and once
+  per concurrent viewer; on the single-core host these serialized on the CPU-capped
+  InfluxDB and everyone waited. Repeated and concurrent requests now share one
+  computation, with short per-endpoint TTLs and a bounded cache size (#280).
 
 ### Fixed
 - The "latest per room / per sensor" reads no longer scan the entire InfluxDB history
