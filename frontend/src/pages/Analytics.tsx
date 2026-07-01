@@ -4,6 +4,7 @@ import {useState} from "react";
 import { useFetchRooms } from '../hooks/useFetchRooms';
 import { RoomDetailModal} from "../components/RoomDetailModal";
 import type { Room } from '../types/room'
+import { RoomFilters} from "../components/RoomFilters";
 
 function SummaryCard({ label, value }: {label: string; value: string | number }) {
     return (
@@ -20,7 +21,8 @@ export default function Analytics() {
     useFetchRooms();
     // Filter & sort state
     const [search, setSearch] = useState('');
-    const [buildingFilter, setBuildingFilter] = useState('');
+    const [selectedBuildings, setSelectedBuildings] = useState<string[]>([]);
+    const [selectedFloors, setSelectedFloors] = useState<string[]>([]);
     const [statusFilter, setStatusFilter] = useState('');
     const [sortBy, setSortBy] = useState('');
     const [selectedRoom, setSelectedRoom] = useState<Room | null>(null);
@@ -28,7 +30,8 @@ export default function Analytics() {
     //Filtered & sorted room list
     const filteredRooms = rooms
             .filter((r) => r.name.toLowerCase().includes(search.toLowerCase()))
-            .filter((r) => buildingFilter === '' || r.building === buildingFilter)
+            .filter((r) => selectedBuildings.length === 0 || selectedBuildings.includes(r.building))
+            .filter((r) => selectedFloors.length === 0 || selectedFloors.includes(String(r.floor)))
             .filter((r) => statusFilter === '' || r.occupancyRate === statusFilter)
         .sort((a, b) => {
             if (sortBy === 'least') return a.count / a.capacity - b.count / b.capacity;
@@ -41,12 +44,12 @@ export default function Analytics() {
     const buildings = [...new Set(rooms.map((r) => r.building))];
 
     //Summary card values
-    const totalRooms = rooms.length;
-    const totalCapacity = rooms.reduce((sum, r) => sum + r.capacity, 0);
-    const totalPeople = rooms.reduce((sum, r) => sum + r.count, 0);
+    const totalRooms = filteredRooms.length;
+    const totalCapacity = filteredRooms.reduce((sum, r) => sum + r.capacity, 0);
+    const totalPeople = filteredRooms.reduce((sum, r) => sum + r.count, 0);
     const occupancyPct = totalCapacity > 0 ? Math.round((totalPeople / totalCapacity) * 100) : 0;
 
-    const columns = ['Raum', 'Gebäude', 'Belegung', 'Auslastung'];
+    const columns = ['Raum', 'Gebäude', 'Etage', 'Belegung', 'Auslastung'];
 
     return (
         <div className="max-w-7xl mx-auto">
@@ -54,6 +57,7 @@ export default function Analytics() {
                 <h1 className="text-3xl font-bold text-purple-600">Analytics</h1>
                 <p className="text-gray-500 mt-2">Campus-Überblick, Filter, Sortierung & Export</p>
             </header>
+
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
                 <SummaryCard label="Räume" value={totalRooms}/>
                 <SummaryCard label="Kapazität" value={totalCapacity}/>
@@ -61,23 +65,20 @@ export default function Analytics() {
                 <SummaryCard label="Auslastung" value={`${occupancyPct}%`}/>
             </div>
 
+            {/* new componoent for room filters*/}
+            <RoomFilters
+                availableBuildings={buildings}
+                selectedBuildings={selectedBuildings}
+                setSelectedBuildings={setSelectedBuildings}
+                availableFloors={['-1', '0', '1', '2']}
+                selectedFloors={selectedFloors}
+                setSelectedFloors={setSelectedFloors}/>
+
             <div className="flex flex-wrap gap-3 mb-4">
 
                 {/* Search input */}
                 <input type="text" placeholder="Suche..." value={search} onChange={(e) => setSearch(e.target.value)}
                        className="bg-white w-full md:w-72 px-4 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-100"/>
-
-                {/* Building filter */}
-                <select
-                    value={buildingFilter}
-                    onChange={(e) => setBuildingFilter(e.target.value)}
-                    className="bg-white px-4 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-100">
-
-                    <option value="">Alle Gebäude</option>
-                    {buildings.map((b) => (
-                        <option key={b} value={b}>{b}</option>
-                    ))}
-                </select>
 
                 {/* Status filter */}
                 <select
@@ -85,7 +86,7 @@ export default function Analytics() {
                     onChange={(e) => setStatusFilter(e.target.value)}
                     className="bg-white px-4 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-100">
 
-                    <option value="">Alle Status</option>
+                    <option value="">Auslastung</option> // Eher
                     <option value="low">Niedrig</option>
                     <option value="medium">Mittel</option>
                     <option value="high">Hoch</option>
@@ -125,6 +126,7 @@ export default function Analytics() {
                                 <span className="ml-2 text-gray-400 font-normal">{room.roomId}</span>
                             </td>
                             <td className="px-4 py-3 text-sm text-gray-600">{room.building}</td>
+                            <td className="px-4 py-3 text-sm text-gray-600">{room.floor}</td>
                             <td className="px-4 py-3 text-sm text-gray-600">{room.count} / {room.capacity}</td>
                             <td className="px-4 py-3 text-sm">
                                 <StatusBadge occupancyRate={room.occupancyRate} />
