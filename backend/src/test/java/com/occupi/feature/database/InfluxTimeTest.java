@@ -5,6 +5,8 @@ import org.junit.jupiter.api.Test;
 
 import java.math.BigInteger;
 import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -34,6 +36,15 @@ class InfluxTimeTest {
     @DisplayName("converts a numeric nanosecond value to Instant")
     void convertsLongNanos() {
         assertThat(InfluxTime.toInstant(1_000_000_000L)).isEqualTo(Instant.ofEpochSecond(1));
+    }
+
+    @Test
+    @DisplayName("reads a timezone-less LocalDateTime (as date_bin returns) as UTC")
+    void convertsLocalDateTimeAsUtc() {
+        LocalDateTime slot = LocalDateTime.of(2026, 6, 14, 10, 0, 0);
+        assertThat(InfluxTime.toInstant(slot))
+                .isEqualTo(slot.toInstant(ZoneOffset.UTC))
+                .isEqualTo(Instant.parse("2026-06-14T10:00:00Z"));
     }
 
     @Test
