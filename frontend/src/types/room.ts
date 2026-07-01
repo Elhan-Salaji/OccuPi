@@ -9,12 +9,12 @@ export interface Occupancy{
 
 export interface ForecastPoint {
     time: string;
-    predictedCount: number;
+    predictedCount: number | null;
 }
 
 export interface HistoryPoint {
     time: string;
-    count: number;
+    count: number | null;
     confidence: number;
 }
 
