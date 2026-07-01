@@ -61,7 +61,7 @@ export const RoomFilters: React.FC<RoomFiltersProps> =
                 {/* building filters */}
                 <div className={"flex flex-col gap-2"}>
             <span className="text-sm text-gray-400 mb-1">
-                Filter buildings
+                Gebäude filtern
             </span>
 
                     <div className="flex flex-wrap gap-2">
@@ -89,7 +89,7 @@ export const RoomFilters: React.FC<RoomFiltersProps> =
                     {/* Filter floors */}
                     <div className={"flex flex-col gap-2"}>
                 <span className="text-sm text-gray-400 mb-1">
-                    Filter floors
+                    Etagen filtern
                 </span>
 
                         <div className="flex flex-wrap gap-2">
@@ -115,7 +115,7 @@ export const RoomFilters: React.FC<RoomFiltersProps> =
                     {/* Filter occupancy */}
                     <div className={"flex flex-col gap-2"}>
                 <span className="text-sm text-gray-400 mb-1">
-                    Filter occupancy
+                    Auslastung filtern
                 </span>
 
                         <div className="flex flex-wrap gap-2">
@@ -128,7 +128,7 @@ export const RoomFilters: React.FC<RoomFiltersProps> =
                                         : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'
                                 }`}
                             >
-                                Low
+                                Niedrig
                             </button>
 
                             {/* Medium Button*/}
@@ -140,7 +140,7 @@ export const RoomFilters: React.FC<RoomFiltersProps> =
                                         : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'
                                 }`}
                             >
-                                Medium
+                                Mittel
                             </button>
 
                             <button
