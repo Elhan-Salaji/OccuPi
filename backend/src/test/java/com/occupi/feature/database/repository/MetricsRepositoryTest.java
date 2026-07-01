@@ -9,6 +9,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -227,6 +228,21 @@ class MetricsRepositoryTest {
                     .thenAnswer(inv -> Stream.empty());
 
             assertTrue(repository.findAllLatest().isEmpty());
+        }
+
+        @Test
+        @DisplayName("should bound the scan with a time predicate (guards #273)")
+        void shouldBoundScanByTime() {
+            when(influxDBClient.query(anyString(), any(QueryOptions.class)))
+                    .thenAnswer(inv -> Stream.empty());
+
+            repository.findAllLatest();
+
+            ArgumentCaptor<String> sqlCaptor = ArgumentCaptor.forClass(String.class);
+            verify(influxDBClient).query(sqlCaptor.capture(), any(QueryOptions.class));
+            assertTrue(sqlCaptor.getValue().contains("time >="),
+                    "findAllLatest must constrain the scan with a time predicate, "
+                            + "otherwise it reads the entire measurement history");
         }
     }
 

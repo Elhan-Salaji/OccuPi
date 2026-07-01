@@ -7,9 +7,11 @@ import com.occupi.feature.database.InfluxTime;
 import com.occupi.feature.database.model.MetricsData;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Repository;
 
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -28,6 +30,15 @@ public class MetricsRepository {
                     + "\"queueSize\", \"sent\", \"dropped\", \"avgProcessTime\", time";
 
     private final InfluxDBClient influxDBClient;
+
+    /**
+     * How many days back {@link #findAllLatest()} scans for the newest row per sensor.
+     * The scan MUST be bounded: without a time predicate InfluxDB reads the whole
+     * measurement history and sorts it on every call, which pegged the single-core
+     * server CPU once a large amount of data had accumulated (#273).
+     */
+    @Value("${metrics.latest-lookback-days:7}")
+    private int latestLookbackDays = 7;
 
     public void save(MetricsData metrics) {
         validate(metrics);
@@ -91,20 +102,25 @@ public class MetricsRepository {
 
     /**
      * Returns the most recent metrics row for every known sensor.
-     * Uses a window function to pick the latest row per sensorId in a single query.
+     * Uses a window function to pick the latest row per sensorId in a single query,
+     * scanning only the last {@link #latestLookbackDays} days so the query stays
+     * cheap regardless of how much history has accumulated (see #273).
      *
-     * @return one latest row per sensor (empty list if no data exists)
+     * @return one latest row per sensor within the lookback window
+     *         (empty list if no sensor has reported in that window)
      */
     public List<MetricsData> findAllLatest() {
+        Instant since = Instant.now().minus(latestLookbackDays, ChronoUnit.DAYS);
         String sql = """
                 SELECT %s
                 FROM (
                     SELECT %s,
                            ROW_NUMBER() OVER (PARTITION BY "sensorId" ORDER BY time DESC) AS rn
                     FROM "%s"
+                    WHERE time >= '%s'
                 )
                 WHERE rn = 1
-                """.formatted(SELECT_COLUMNS, SELECT_COLUMNS, MEASUREMENT_NAME);
+                """.formatted(SELECT_COLUMNS, SELECT_COLUMNS, MEASUREMENT_NAME, since);
 
         List<MetricsData> result = new ArrayList<>();
         try (Stream<Object[]> rows = influxDBClient.query(sql, QueryOptions.defaultQueryOptions())) {
