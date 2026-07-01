@@ -3,6 +3,7 @@ import { StatusBadge} from '../components/RoomStatus';
 import {useState} from "react";
 import { useFetchRooms } from '../hooks/useFetchRooms';
 import { RoomDetailModal} from "../components/RoomDetailModal";
+import {PinButton} from "../components/PinButton";
 import type { Room } from '../types/room'
 
 function SummaryCard({ label, value }: {label: string; value: string | number }) {
@@ -47,7 +48,7 @@ export default function Analytics() {
     const occupancyPct = totalCapacity > 0 ? Math.round((totalPeople / totalCapacity) * 100) : 0;
     const occupancyUnavailable = rooms.some((r) => r.occupancyRate === 'unknown');
 
-    const columns = ['Raum', 'Gebäude', 'Belegung', 'Auslastung'];
+    const columns = ['Raum', 'Gebäude', 'Belegung', 'Auslastung', 'Pin'];
 
     return (
         <div className="max-w-7xl mx-auto">
@@ -129,6 +130,9 @@ export default function Analytics() {
                             <td className="px-4 py-3 text-sm text-gray-600">{room.occupancyRate === 'unknown' ? '—' : `${room.count} / ${room.capacity}`}</td>
                             <td className="px-4 py-3 text-sm">
                                 <StatusBadge occupancyRate={room.occupancyRate} />
+                            </td>
+                            <td className="px-4 py-3">
+                                <PinButton roomId={room.roomId} />
                             </td>
                         </tr>
                     ))}
