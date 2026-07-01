@@ -18,6 +18,23 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `dialout` group, so on the Pi a plain `docker compose up` with `SENSOR_MODE=real` streams
   live occupancy for room 137 (#201).
 
+### Changed
+- The InfluxDB container now runs under a hard resource ceiling in the production
+  compose (0.5 CPU, 2 GiB memory) so one heavy query can never starve the single-core
+  host again. InfluxDB 3 Core does not cancel a running query when the client
+  disconnects, so this cap is the backstop that keeps the box reachable. Auto-deploy
+  only recreates backend/frontend, so applying it needs a manual
+  `docker compose ... up -d influxdb` (#273).
+
+### Fixed
+- The "latest per room / per sensor" reads no longer scan the entire InfluxDB history
+  on every call. The window-function queries in `OccupancyRepository.findAllLatest`
+  and `MetricsRepository.findAllLatest` are now bounded to a configurable recent
+  window (`occupancy.latest-lookback-days` / `metrics.latest-lookback-days`, default
+  7 days). An unbounded scan of a full year of data took about 7 minutes and, polled
+  every 30 s by the frontend, pinned the single-core server's only CPU and made the
+  whole machine unreachable over SSH; the bounded query returns in under a second (#273).
+
 ### Security
 - Room create, update and delete (`POST`/`PUT`/`DELETE /api/rooms`) now require the
   Keycloak `admin` realm role, enforced with method security (`@PreAuthorize`) on the
