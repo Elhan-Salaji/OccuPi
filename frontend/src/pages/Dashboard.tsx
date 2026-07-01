@@ -1,7 +1,6 @@
 import { useState} from 'react';
 import { useRoomStore } from '../hooks/useRoomStore';
 import { Users, Activity } from 'lucide-react';
-import { useFetchRooms } from '../hooks/useFetchRooms';
 import type { Room} from "../types/room";
 import { RoomDetailModal} from "../components/RoomDetailModal";
 import { useDashboardStore } from "../hooks/useDashboardStore";
@@ -9,8 +8,6 @@ import { useDashboardStore } from "../hooks/useDashboardStore";
 export default function Dashboard() {
     // we retrieve spaces and function for setting them from the sore
     const { rooms, isConnected, isMockData } = useRoomStore();
-
-    useFetchRooms();
 
     const [selectedRoom, setSelectedRoom] = useState<Room | null>(null);
     const occupancyUnavailable = rooms.some((r) => r.occupancyRate === 'unknown');
@@ -45,7 +42,7 @@ export default function Dashboard() {
                 </div>
             )}
 
-            {pinnedRooms.length === 0 ? (
+            {pinnedRooms.length === 0 ? null : pinnedRooms.length === 0 ? (
                 <div className="py-16 text-center text-gray-400">
                     <p className="mb-1 font-medium">Noch keine Räume gepinnt</p>
                     <p className="text-sm">Pinne Räume über die Raumübersicht an dein Dashboard.</p>
