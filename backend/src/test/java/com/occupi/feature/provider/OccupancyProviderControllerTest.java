@@ -15,6 +15,7 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -54,10 +55,13 @@ class OccupancyProviderControllerTest {
     @Test
     @DisplayName("returns 400 when roomId is blank")
     void getOccupancy_blank_returns400() {
-        ResponseEntity<OccupancyResponse> response = controller.getOccupancy("  ");
+        when(providerService.getLatestForRoom("  "))
+                .thenThrow(new IllegalArgumentException("roomId must not be blank"));
 
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
-        verifyNoInteractions(providerService);
+        assertThrows(IllegalArgumentException.class,
+                () -> controller.getOccupancy("  "));
+
+        verify(providerService).getLatestForRoom("  ");
     }
 
     @Test

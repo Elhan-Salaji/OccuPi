@@ -26,6 +26,25 @@ influxdb:
   database: occupi
   token: ""
 
+# "Latest per room / per sensor" reads only scan this many days back, so the
+# InfluxDB window-function query never walks the full measurement history. An
+# unbounded scan pinned the single-core server CPU and crashed it once a large
+# amount of data had accumulated (#273).
+occupancy:
+  latest-lookback-days: 7
+metrics:
+  latest-lookback-days: 7
+
+# Caches for the room-detail reads (history / forecast / week-pattern). These results
+# are identical for every viewer of a room and change slowly, so a short-lived cache
+# keeps repeated and concurrent requests off the CPU-capped InfluxDB (#280).
+chart:
+  cache:
+    history-ttl-seconds: 60
+    forecast-ttl-seconds: 600
+    weekpattern-ttl-seconds: 1800
+    max-entries: 2000
+
 logging:
   level:
     com.occupi: DEBUG

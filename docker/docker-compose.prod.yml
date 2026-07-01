@@ -45,5 +45,24 @@ services:
     ports:
       - "127.0.0.1:8180:8080"   # host Nginx → keycloak
 
+  # Hard resource ceiling for InfluxDB. The dashboard's "latest per room" read
+  # used to scan the full measurement history; on this single-core host that one
+  # query pinned the CPU and took the whole machine (SSH included) down (#273).
+  # InfluxDB 3 Core does not cancel a running query when the client disconnects,
+  # so this cap is the backstop that keeps the box responsive even if a heavy
+  # query ever slips through again: at most half the core for InfluxDB, and if it
+  # balloons past 2 GiB Docker OOM-kills (and restarts) InfluxDB instead of the host.
+  #
+  # NOTE: auto-deploy only recreates backend/frontend (see deploy/auto-deploy.sh),
+  # so applying this cap needs a manual `docker compose ... up -d influxdb`.
+  influxdb:
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 2g
+        reservations:
+          memory: 256m
+
   # influxdb & postgres intentionally have NO 'ports' here:
   # they stay on the internal Docker network and are not exposed to the host.

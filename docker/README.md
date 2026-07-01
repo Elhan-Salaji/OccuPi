@@ -60,6 +60,22 @@ In prod:
 - Keycloak runs with `KC_HOSTNAME` / `KC_HOSTNAME_STRICT=true` / `KC_PROXY_HEADERS=xforwarded`
   and is served under **`/auth`** (`KC_HTTP_RELATIVE_PATH=/auth`), behind the host Nginx.
 
+### InfluxDB resource cap
+The prod overlay caps InfluxDB at **0.5 CPU and 2 GiB memory**. The dashboard's "latest
+per room" read once scanned the full measurement history on every 30 s poll; on this
+single-core, swapless host that one query pinned the CPU and took the whole machine (SSH
+included) down (#273). The query is now time-bounded in the backend, but the cap stays as
+a backstop — InfluxDB 3 Core does not cancel a running query when the client disconnects,
+so this is what keeps the host reachable if a heavy query ever slips through again.
+
+Auto-deploy only recreates `backend`/`frontend` (see [`../deploy/auto-deploy.sh`](../deploy/auto-deploy.sh)),
+so a normal deploy does **not** apply the cap — apply it once manually:
+```bash
+cd docker
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d influxdb
+docker inspect occupi-influxdb3 -f 'nanocpus={{.HostConfig.NanoCpus}} mem={{.HostConfig.Memory}}'
+```
+
 ### Host Nginx (already present on the server)
 The reverse proxy lives on the host (not in Compose). The versioned config is
 [`../deploy/nginx/occupi.conf`](../deploy/nginx/occupi.conf):

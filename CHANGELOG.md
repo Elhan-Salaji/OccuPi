@@ -18,6 +18,35 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `dialout` group, so on the Pi a plain `docker compose up` with `SENSOR_MODE=real` streams
   live occupancy for room 137 (#201).
 
+### Changed
+- The InfluxDB container now runs under a hard resource ceiling in the production
+  compose (0.5 CPU, 2 GiB memory) so one heavy query can never starve the single-core
+  host again. InfluxDB 3 Core does not cancel a running query when the client
+  disconnects, so this cap is the backstop that keeps the box reachable. Auto-deploy
+  only recreates backend/frontend, so applying it needs a manual
+  `docker compose ... up -d influxdb` (#273).
+- The room-detail reads (`GET /api/occupancy/history`, `/api/forecast`,
+  `/api/occupancy/weekpattern`) are now cached in memory (Caffeine), keyed by room and
+  window. Opening a room or switching the hour filter re-ran all three — including a full
+  8-week week-pattern scan and the forecast's four lookback queries — every time and once
+  per concurrent viewer; on the single-core host these serialized on the CPU-capped
+  InfluxDB and everyone waited. Repeated and concurrent requests now share one
+  computation, with short per-endpoint TTLs and a bounded cache size (#280).
+
+### Fixed
+- `POST /api/rooms` now rejects a create whose `roomId` already exists with
+  `409 Conflict` instead of silently overwriting the stored room. Rooms use an
+  assigned ID, so `save()` on a duplicate acted as an update and corrupted the
+  existing room's metadata; the admin panel already shows "Raum-ID existiert
+  bereits." for the 409 (#248).
+- The "latest per room / per sensor" reads no longer scan the entire InfluxDB history
+  on every call. The window-function queries in `OccupancyRepository.findAllLatest`
+  and `MetricsRepository.findAllLatest` are now bounded to a configurable recent
+  window (`occupancy.latest-lookback-days` / `metrics.latest-lookback-days`, default
+  7 days). An unbounded scan of a full year of data took about 7 minutes and, polled
+  every 30 s by the frontend, pinned the single-core server's only CPU and made the
+  whole machine unreachable over SSH; the bounded query returns in under a second (#273).
+
 ### Security
 - Room create, update and delete (`POST`/`PUT`/`DELETE /api/rooms`) now require the
   Keycloak `admin` realm role, enforced with method security (`@PreAuthorize`) on the
