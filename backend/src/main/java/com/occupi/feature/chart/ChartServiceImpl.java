@@ -13,7 +13,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
+import java.time.Clock;
 import java.time.DayOfWeek;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
@@ -28,10 +30,12 @@ import java.util.stream.Stream;
 /**
  * Default {@link ChartService} implementation.
  *
- * <p>Reads raw occupancy points from InfluxDB and aggregates them in memory —
- * mirroring the {@code forecast} feature — so the read path stays consistent and
- * unit-testable against a mocked client. Aggregating in Java (rather than via SQL
- * {@code GROUP BY}) also keeps weekday/hour bucketing in the configured local zone.
+ * <p>Reads occupancy points from InfluxDB for the room detail view. The history
+ * series is bucketed into regular, window-scaled slots straight in the database via
+ * {@code date_bin} + {@code GROUP BY} (#278), with empty slots filled in afterwards so
+ * gaps stay visible. The weekly pattern still aggregates in memory — mirroring the
+ * {@code forecast} feature — so weekday/hour bucketing happens in the configured local
+ * zone rather than via SQL.
  */
 @Slf4j
 @Service
@@ -55,6 +59,9 @@ public class ChartServiceImpl implements ChartService {
     @Value("${chart.weekpattern.quiet-end-hour:18}")
     private int quietEndHour;
 
+    /** The wall clock the read window is measured against; overridable in tests. */
+    private Clock clock = Clock.systemUTC();
+
     public ChartServiceImpl(InfluxDBClient influxDBClient, RoomService roomService) {
         this.influxDBClient = influxDBClient;
         this.roomService = roomService;
@@ -67,19 +74,28 @@ public class ChartServiceImpl implements ChartService {
             throw new IllegalArgumentException("hours must be positive, got: " + hours);
         }
 
-        Instant end = Instant.now();
-        Instant start = end.minus(hours, ChronoUnit.HOURS);
+        int slotMinutes = TimeSlots.slotMinutes(hours, maxPoints);
+        Duration slot = Duration.ofMinutes(slotMinutes);
 
-        List<Object[]> rows = queryReadings(roomId, start, end, "\"count\", \"confidence\", time");
+        Instant end = clock.instant();
+        Instant gridStart = TimeSlots.floorToSlot(end.minus(hours, ChronoUnit.HOURS), slot);
 
-        List<HistoryPoint> points = rows.size() <= maxPoints
-                ? toRawPoints(rows)
-                : toDownsampledPoints(rows, slotMinutesFor(hours));
+        Map<Instant, double[]> buckets = queryHistoryBuckets(roomId, gridStart, end, slotMinutes);
 
-        log.debug("History for room={} window={}h: rows={} points={} downsampled={}",
-                roomId, hours, rows.size(), points.size(), rows.size() > maxPoints);
+        List<HistoryPoint> points = TimeSlots.grid(gridStart, end, slot).stream()
+                .map(slotStart -> {
+                    double[] agg = buckets.get(slotStart);
+                    if (agg == null) {
+                        return new HistoryPoint(slotStart, null, 0.0); // explicit gap
+                    }
+                    return new HistoryPoint(slotStart, (int) Math.round(agg[0]), agg[1]);
+                })
+                .toList();
 
-        return new HistoryResponse(roomId, points, start, end);
+        log.debug("History for room={} window={}h: slotMinutes={} slots={} filled={}",
+                roomId, hours, slotMinutes, points.size(), buckets.size());
+
+        return new HistoryResponse(roomId, points, gridStart, end);
     }
 
     @Override
@@ -89,7 +105,7 @@ public class ChartServiceImpl implements ChartService {
             throw new IllegalArgumentException("weeks must be positive, got: " + weeks);
         }
 
-        Instant end = Instant.now();
+        Instant end = clock.instant();
         Instant start = end.minus(weeks * 7L, ChronoUnit.DAYS);
 
         List<Object[]> rows = queryReadings(roomId, start, end, "\"count\", time");
@@ -141,69 +157,41 @@ public class ChartServiceImpl implements ChartService {
     }
 
     /**
-     * Returns one {@link HistoryPoint} per reading, untouched. Used when the window
-     * holds at most {@link #maxPoints} readings, i.e. the raw resolution already
-     * fits within the cap.
+     * Buckets the room's readings into fixed {@code slotMinutes}-wide slots straight in
+     * InfluxDB via {@code date_bin} + {@code GROUP BY}, so the heavy aggregation runs in
+     * the database (keeping the read path off the single-core server's heap — #259/#264)
+     * and only one row per non-empty slot crosses the wire. Bins are anchored to the
+     * Unix epoch, matching {@link TimeSlots#floorToSlot}, so each returned slot start
+     * lines up with a grid instant. Empty slots are filled in by {@link #getHistory}.
+     *
+     * @return slot-start instant → {@code [avgCount, avgConfidence]} for each non-empty slot
      */
-    private List<HistoryPoint> toRawPoints(List<Object[]> rows) {
-        List<HistoryPoint> points = new ArrayList<>(rows.size());
-        for (Object[] row : rows) {
-            if (row[0] == null || row[2] == null) {
-                continue;
-            }
-            int count = ((Number) row[0]).intValue();
-            double confidence = row[1] == null ? 0.0 : ((Number) row[1]).doubleValue();
-            points.add(new HistoryPoint(InfluxTime.toInstant(row[2]), count, confidence));
+    private Map<Instant, double[]> queryHistoryBuckets(String roomId, Instant start, Instant end, int slotMinutes) {
+        String sql = """
+                SELECT date_bin(INTERVAL '%d minutes', time, TIMESTAMP '1970-01-01T00:00:00Z') AS slot,
+                       avg("count") AS avg_count,
+                       avg("confidence") AS avg_confidence
+                FROM "%s"
+                WHERE "roomId" = '%s'
+                  AND time >= '%s'
+                  AND time < '%s'
+                GROUP BY slot
+                ORDER BY slot ASC
+                """.formatted(slotMinutes, measurement, roomId, start, end);
+
+        Map<Instant, double[]> buckets = new LinkedHashMap<>();
+        try (Stream<Object[]> rows = influxDBClient.query(sql, QueryOptions.defaultQueryOptions())) {
+            rows.forEach(row -> {
+                if (row == null || row.length < 2 || row[0] == null || row[1] == null) {
+                    return;
+                }
+                Instant slotStart = InfluxTime.toInstant(row[0]);
+                double avgCount = ((Number) row[1]).doubleValue();
+                double avgConfidence = row.length > 2 && row[2] != null ? ((Number) row[2]).doubleValue() : 0.0;
+                buckets.put(slotStart, new double[]{avgCount, avgConfidence});
+            });
         }
-        return points;
-    }
-
-    /**
-     * Aggregates readings into fixed {@code slotMinutes}-wide slots (count and
-     * confidence averaged), so a busy window doesn't ship thousands of points.
-     */
-    private List<HistoryPoint> toDownsampledPoints(List<Object[]> rows, int slotMinutes) {
-        long slotSeconds = slotMinutes * 60L;
-        // slot start (epoch seconds) → [sumCount, sumConfidence, sampleCount]
-        Map<Long, double[]> slots = new LinkedHashMap<>();
-
-        for (Object[] row : rows) {
-            if (row[0] == null || row[2] == null) {
-                continue;
-            }
-            double count = ((Number) row[0]).doubleValue();
-            double confidence = row[1] == null ? 0.0 : ((Number) row[1]).doubleValue();
-            long epochSecond = InfluxTime.toInstant(row[2]).getEpochSecond();
-            long slotStart = Math.floorDiv(epochSecond, slotSeconds) * slotSeconds;
-
-            double[] acc = slots.computeIfAbsent(slotStart, k -> new double[]{0.0, 0.0, 0.0});
-            acc[0] += count;
-            acc[1] += confidence;
-            acc[2] += 1;
-        }
-
-        return slots.entrySet().stream()
-                .sorted(Map.Entry.comparingByKey())
-                .map(e -> {
-                    double[] acc = e.getValue();
-                    int avgCount = (int) Math.round(acc[0] / acc[2]);
-                    double avgConfidence = acc[1] / acc[2];
-                    return new HistoryPoint(Instant.ofEpochSecond(e.getKey()), avgCount, avgConfidence);
-                })
-                .toList();
-    }
-
-    /**
-     * Picks the slot width (minutes) for downsampling from the window length, so the
-     * returned series stays at or below {@link #maxPoints} regardless of the sensor's
-     * write rate. Targets {@code maxPoints - 1} full slots; because the window edges
-     * are not aligned to the slot grid, at most one extra partial slot can appear,
-     * keeping the total within the cap.
-     */
-    private int slotMinutesFor(int hours) {
-        long windowMinutes = (long) hours * 60L;
-        long targetSlots = Math.max(1L, maxPoints - 1L);
-        return (int) Math.max(1L, (long) Math.ceil((double) windowMinutes / targetSlots));
+        return buckets;
     }
 
     private WeekPatternExtreme toExtreme(WeekPatternSlot slot) {
