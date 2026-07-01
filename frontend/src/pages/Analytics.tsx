@@ -45,6 +45,7 @@ export default function Analytics() {
     const totalCapacity = rooms.reduce((sum, r) => sum + r.capacity, 0);
     const totalPeople = rooms.reduce((sum, r) => sum + r.count, 0);
     const occupancyPct = totalCapacity > 0 ? Math.round((totalPeople / totalCapacity) * 100) : 0;
+    const occupancyUnavailable = rooms.some((r) => r.occupancyRate === 'unknown');
 
     const columns = ['Raum', 'Gebäude', 'Belegung', 'Auslastung'];
 
@@ -57,8 +58,8 @@ export default function Analytics() {
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
                 <SummaryCard label="Räume" value={totalRooms}/>
                 <SummaryCard label="Kapazität" value={totalCapacity}/>
-                <SummaryCard label="Personen anwesend" value={totalPeople}/>
-                <SummaryCard label="Auslastung" value={`${occupancyPct}%`}/>
+                <SummaryCard label="Personen anwesend" value={occupancyUnavailable ? '—' : totalPeople}/>
+                <SummaryCard label="Auslastung" value={occupancyUnavailable ? '—' : `${occupancyPct}%`}/>
             </div>
 
             <div className="flex flex-wrap gap-3 mb-4">
@@ -125,7 +126,7 @@ export default function Analytics() {
                                 <span className="ml-2 text-gray-400 font-normal">{room.roomId}</span>
                             </td>
                             <td className="px-4 py-3 text-sm text-gray-600">{room.building}</td>
-                            <td className="px-4 py-3 text-sm text-gray-600">{room.count} / {room.capacity}</td>
+                            <td className="px-4 py-3 text-sm text-gray-600">{room.occupancyRate === 'unknown' ? '—' : `${room.count} / ${room.capacity}`}</td>
                             <td className="px-4 py-3 text-sm">
                                 <StatusBadge occupancyRate={room.occupancyRate} />
                             </td>
