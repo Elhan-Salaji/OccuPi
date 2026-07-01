@@ -30,41 +30,41 @@ export const RoomDetailModal = ({room, isOpen, onClose}: RoomDetailModalProps) =
         weekPattern?.pattern.length === 0;
 
     useEffect(() => {
-        if (!isOpen) return;
-        setIsLoading(true);
-        setHistory(null);
-        setForecast(null);
-        setWeekPattern(null);
-        setUsingMockData({ history: false, forecast: false, weekPattern: false});
-
-        Promise.all([
-            fetchHistory(room.roomId, timeRange).catch(() => {
-                setUsingMockData(prev => ({ ...prev,history: true}));
-                return MOCK_HISTORY;
-            }),
-            fetchForecast(room.roomId, timeRange).catch(() => {
-                setUsingMockData(prev => ({ ...prev,forecast: true}));
-                return MOCK_FORECAST;
-            }),
-            fetchWeekPattern(room.roomId).catch(() => {
-                setUsingMockData(prev => ({ ...prev,weekPattern: true}));
-                return MOCK_WEEKPATTERN;
-            }),
-        ]).then(([historyData, forecastData, weekPatternData]) => {
-            setHistory(historyData);
-            setForecast(forecastData);
-            setWeekPattern(weekPatternData);
-            setIsLoading(false);
-        });
-    }, [room?.roomId, timeRange, isOpen]);
-
-    useEffect(() => {
         const handleEsc = (e: KeyboardEvent) => {
             if (e.key === 'Escape') onClose();
         };
         document.addEventListener('keydown', handleEsc);
         return () => document.removeEventListener('keydown', handleEsc);
     }, [onClose]);
+
+    useEffect(() => {
+        if (!isOpen) return;
+        let cancelled = false;
+        const mock = { history: false, forecast: false, weekPattern: false};
+
+        Promise.all([
+            fetchHistory(room.roomId, timeRange).catch(() => {
+                mock.history = true;
+                return MOCK_HISTORY;
+            }),
+            fetchForecast(room.roomId, timeRange).catch(() => {
+                mock.forecast = true;
+                return MOCK_FORECAST;
+            }),
+            fetchWeekPattern(room.roomId).catch(() => {
+                mock.weekPattern = true;
+                return MOCK_WEEKPATTERN;
+            }),
+        ]).then(([historyData, forecastData, weekPatternData]) => {
+            if (cancelled) return;
+            setHistory(historyData);
+            setForecast(forecastData);
+            setWeekPattern(weekPatternData);
+            setUsingMockData(mock);
+            setIsLoading(false);
+        });
+        return () => {cancelled = true;};
+    }, [room?.roomId, timeRange, isOpen]);
 
     useEffect(() => {
         if (!isOpen) return;
@@ -146,7 +146,7 @@ export const RoomDetailModal = ({room, isOpen, onClose}: RoomDetailModalProps) =
                                         <h3 className="text-lg font-semibold"> Verlauf & Prognose</h3>
                                         <div className="flex gap-1">
                                             {[1, 3, 12, 24, 168].map(h => (
-                                                <button key={h} onClick={() => setTimeRange(h)}
+                                                <button key={h} onClick={() => { setIsLoading(true); setTimeRange(h); }}
                                                 className={`px-3 py-1 text-sm rounded-lg ${timeRange === h ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
                                                     {h === 168 ? '1W' : `${h}h`}
                                                 </button>
