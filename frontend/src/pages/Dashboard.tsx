@@ -42,7 +42,7 @@ export default function Dashboard() {
                 </div>
             )}
 
-            {pinnedRooms.length === 0 ? null : pinnedRooms.length === 0 ? (
+            {rooms.length === 0 ? null : pinnedRooms.length === 0 ? (
                 <div className="py-16 text-center text-gray-400">
                     <p className="mb-1 font-medium">Noch keine Räume gepinnt</p>
                     <p className="text-sm">Pinne Räume über die Raumübersicht an dein Dashboard.</p>
