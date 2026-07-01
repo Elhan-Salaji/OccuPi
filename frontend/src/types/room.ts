@@ -66,7 +66,7 @@ export interface Room {
     count: number; // How many people are in the room?
     confidence: number;
     timestamp: string; //
-    occupancyRate: 'low' | 'medium' | 'high'; // status
+    occupancyRate: 'low' | 'medium' | 'high' | 'unknown'; // status
 }
 
 export interface RoomResponse {
