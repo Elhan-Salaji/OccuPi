@@ -2,6 +2,7 @@ package com.occupi.feature.chart;
 
 import com.influxdb.v3.client.InfluxDBClient;
 import com.influxdb.v3.client.query.QueryOptions;
+import com.occupi.app.CacheConfig;
 import com.occupi.feature.chart.dto.HistoryPoint;
 import com.occupi.feature.chart.dto.HistoryResponse;
 import com.occupi.feature.chart.dto.WeekPatternExtreme;
@@ -11,6 +12,7 @@ import com.occupi.feature.database.InfluxTime;
 import com.occupi.feature.room.RoomService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 
 import java.time.DayOfWeek;
@@ -61,6 +63,8 @@ public class ChartServiceImpl implements ChartService {
     }
 
     @Override
+    @Cacheable(cacheNames = CacheConfig.HISTORY, key = "#roomId + '@' + #hours",
+            unless = "#result == null || #result.points().isEmpty()")
     public HistoryResponse getHistory(String roomId, int hours) {
         validateRoomId(roomId);
         if (hours <= 0) {
@@ -83,6 +87,8 @@ public class ChartServiceImpl implements ChartService {
     }
 
     @Override
+    @Cacheable(cacheNames = CacheConfig.WEEK_PATTERN, key = "#roomId + '@' + #weeks",
+            unless = "#result == null || #result.pattern().isEmpty()")
     public WeekPatternResponse getWeekPattern(String roomId, int weeks) {
         validateRoomId(roomId);
         if (weeks <= 0) {
