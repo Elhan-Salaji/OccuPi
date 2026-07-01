@@ -10,7 +10,7 @@ const columns: { label: string; render: (r: Room) => React.ReactNode }[] = [
     {label: 'Raum', render: (r) => r.name },
     {label: 'Gebäude', render: (r) => r.building},
     {label: 'Etage', render: (r) => String(r.floor) },
-    {label: 'Belegung', render: (r) => <OccupancyBar count={r.count} capacity={r.capacity} /> },
+    {label: 'Belegung', render: (r) => <OccupancyBar count={r.count} capacity={r.capacity} unavailable={r.occupancyRate === 'unknown'} /> },
     {label: 'Auslastung', render: (r) => <StatusBadge occupancyRate={r.occupancyRate}/> },
     {label: 'Aktualisiert', render: (r) => formatTime(r.timestamp) },
 
