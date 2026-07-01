@@ -9,14 +9,16 @@ import com.occupi.feature.chart.dto.WeekPatternResponse;
 public interface ChartService {
 
     /**
-     * Returns the occupancy history for a room over the last {@code hours}.
-     * Raw points are returned when the window holds at most
-     * {@code chart.history.max-points} readings; busier windows are downsampled
-     * into adaptively-sized slots so the series never exceeds that cap.
+     * Returns the occupancy history for a room over the last {@code hours} as a
+     * regular, window-scaled slot series (#278). The slot width is derived from the
+     * window (wider windows use wider slots, capped at
+     * {@code chart.history.max-points} slots), boundaries are aligned to a clean grid,
+     * and a slot with no readings is still emitted with a {@code null} count — so gaps
+     * stay visible and an empty slot is distinguishable from a real {@code count = 0}.
      *
      * @param roomId the room to query
      * @param hours  the look-back window in hours (must be &gt; 0)
-     * @return a {@link HistoryResponse} with the points and the queried window
+     * @return a {@link HistoryResponse} with the slot points and the queried window
      */
     HistoryResponse getHistory(String roomId, int hours);
 
