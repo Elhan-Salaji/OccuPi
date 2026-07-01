@@ -2,6 +2,7 @@ package com.occupi.feature.chart;
 
 import com.influxdb.v3.client.InfluxDBClient;
 import com.influxdb.v3.client.query.QueryOptions;
+import com.occupi.feature.chart.dto.HistoryPoint;
 import com.occupi.feature.chart.dto.HistoryResponse;
 import com.occupi.feature.chart.dto.WeekPatternResponse;
 import com.occupi.feature.chart.dto.WeekPatternSlot;
@@ -16,12 +17,14 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.math.BigInteger;
+import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
-import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -43,11 +46,16 @@ class ChartServiceImplTest {
 
     private ChartServiceImpl service;
 
-    /** Mirrors how InfluxDB 3 returns the time column: nanoseconds since epoch. */
+    /** Mirrors how InfluxDB 3 returns timestamp columns: nanoseconds since epoch. */
     private static BigInteger nanos(Instant t) {
         return BigInteger.valueOf(t.getEpochSecond())
                 .multiply(BigInteger.valueOf(1_000_000_000L))
                 .add(BigInteger.valueOf(t.getNano()));
+    }
+
+    /** One bucketed history row as {@code date_bin} + GROUP BY returns it: [slot, avgCount, avgConfidence]. */
+    private static Object[] bucket(Instant slotStart, double avgCount, double avgConfidence) {
+        return new Object[]{nanos(slotStart), avgCount, avgConfidence};
     }
 
     /** Builds an instant at a fixed local wall-clock time, so weekday/hour are zone-independent. */
@@ -55,6 +63,10 @@ class ChartServiceImplTest {
         return LocalDateTime.of(year, month, day, hour, minute)
                 .atZone(ZoneId.systemDefault())
                 .toInstant();
+    }
+
+    private void fixClockAt(Instant now) {
+        ReflectionTestUtils.setField(service, "clock", Clock.fixed(now, ZoneOffset.UTC));
     }
 
     @BeforeEach
@@ -69,87 +81,86 @@ class ChartServiceImplTest {
     // ---------- history ----------
 
     @Test
-    @DisplayName("history returns raw points unchanged when the readings fit within the cap")
-    void getHistory_readingsWithinCap_returnsRawPoints() {
-        Instant t1 = Instant.parse("2025-01-13T10:00:00Z");
-        Instant t2 = Instant.parse("2025-01-13T10:05:00Z");
+    @DisplayName("history emits one point per grid slot, filling empty slots with a null count")
+    void getHistory_bucketsOntoGrid_fillsGapsWithNull() {
+        // now 10:07:33, 1h window → 10-min slots aligned to a clean grid, gridStart 09:00.
+        fixClockAt(Instant.parse("2025-01-13T10:07:33Z"));
+        Instant s0900 = Instant.parse("2025-01-13T09:00:00Z");
+        Instant s0920 = Instant.parse("2025-01-13T09:20:00Z");
+        Instant s0930 = Instant.parse("2025-01-13T09:30:00Z");
         when(influxDBClient.query(anyString(), any(QueryOptions.class)))
                 .thenAnswer(inv -> Stream.<Object[]>of(
-                        new Object[]{15, 0.92, nanos(t1)},
-                        new Object[]{18, 0.88, nanos(t2)}));
-
-        HistoryResponse response = service.getHistory("room-1", 2);
-
-        assertThat(response.roomId()).isEqualTo("room-1");
-        assertThat(response.points()).hasSize(2);
-        assertThat(response.points().get(0).time()).isEqualTo(t1);
-        assertThat(response.points().get(0).count()).isEqualTo(15);
-        assertThat(response.points().get(0).confidence()).isEqualTo(0.92);
-        assertThat(response.points().get(1).count()).isEqualTo(18);
-        assertThat(response.start()).isBefore(response.end());
-    }
-
-    @Test
-    @DisplayName("history downsamples into averaged slots once the readings exceed the cap")
-    void getHistory_moreReadingsThanCap_downsamplesIntoSlots() {
-        // A cap of 3 with 4 readings forces the downsample branch. For a 1h window
-        // the adaptive slot width is slotMinutesFor(1) = ceil(60 / (3 - 1)) = 30 min,
-        // so the readings fall into the same epoch-aligned 30-min slots as before:
-        //   three readings in [10:00,10:30) → avg count 20, one in [11:00,11:30) → 8.
-        ReflectionTestUtils.setField(service, "maxPoints", 3);
-        Instant a = Instant.parse("2025-01-13T10:00:00Z");
-        Instant b = Instant.parse("2025-01-13T10:10:00Z");
-        Instant c = Instant.parse("2025-01-13T10:20:00Z");
-        Instant d = Instant.parse("2025-01-13T11:00:00Z");
-        when(influxDBClient.query(anyString(), any(QueryOptions.class)))
-                .thenAnswer(inv -> Stream.<Object[]>of(
-                        new Object[]{10, 0.9, nanos(a)},
-                        new Object[]{20, 0.9, nanos(b)},
-                        new Object[]{30, 0.9, nanos(c)},
-                        new Object[]{8, 0.9, nanos(d)}));
+                        bucket(s0900, 12.6, 0.9),  // rounds up to 13
+                        bucket(s0920, 0.0, 0.5),   // a real zero, not a gap
+                        bucket(s0930, 8.4, 0.8))); // rounds down to 8
 
         HistoryResponse response = service.getHistory("room-1", 1);
 
-        assertThat(response.points()).hasSizeLessThanOrEqualTo(3);
-        assertThat(response.points()).hasSize(2);
-        assertThat(response.points().get(0).time()).isEqualTo(Instant.parse("2025-01-13T10:00:00Z"));
-        assertThat(response.points().get(0).count()).isEqualTo(20);
-        assertThat(response.points().get(0).confidence()).isCloseTo(0.9, within(1e-9));
-        assertThat(response.points().get(1).time()).isEqualTo(Instant.parse("2025-01-13T11:00:00Z"));
-        assertThat(response.points().get(1).count()).isEqualTo(8);
+        assertThat(response.roomId()).isEqualTo("room-1");
+        assertThat(response.start()).isEqualTo(s0900);
+        assertThat(response.end()).isEqualTo(Instant.parse("2025-01-13T10:07:33Z"));
+
+        // 09:00, 09:10, … 10:00 → seven evenly spaced slots.
+        assertThat(response.points()).hasSize(7);
+        assertThat(response.points()).extracting(HistoryPoint::time).containsExactly(
+                s0900,
+                Instant.parse("2025-01-13T09:10:00Z"),
+                s0920,
+                s0930,
+                Instant.parse("2025-01-13T09:40:00Z"),
+                Instant.parse("2025-01-13T09:50:00Z"),
+                Instant.parse("2025-01-13T10:00:00Z"));
+
+        assertThat(response.points().get(0).count()).isEqualTo(13);
+        assertThat(response.points().get(0).confidence()).isEqualTo(0.9);
+        assertThat(response.points().get(3).count()).isEqualTo(8);
+
+        // A real count = 0 stays 0; an empty slot is null — the two are distinguishable.
+        assertThat(response.points().get(2).count()).isEqualTo(0);
+        assertThat(response.points().get(1).count()).isNull();
+        assertThat(response.points().get(1).confidence()).isEqualTo(0.0);
+        assertThat(response.points().get(6).count()).isNull();
     }
 
     @Test
-    @DisplayName("history never returns more than max-points, however dense the window")
-    void getHistory_denseWindow_neverExceedsMaxPoints() {
-        int cap = 10;
-        ReflectionTestUtils.setField(service, "maxPoints", cap);
-        // One reading every 5 minutes across a full week → 2016 readings, far above
-        // the cap and all within the 168h window.
-        Instant base = Instant.parse("2025-01-13T00:00:00Z");
-        List<Object[]> readings = IntStream.range(0, 2016)
-                .mapToObj(i -> new Object[]{i % 50, 0.9, nanos(base.plusSeconds(i * 300L))})
-                .toList();
+    @DisplayName("history slot width scales with the window, and a no-data room yields a full grid of empty slots")
+    void getHistory_widerSlotForLongerWindow_emptyGridWhenNoData() {
+        // now 10:07:33, 24h window → 2-hour slots.
+        fixClockAt(Instant.parse("2025-01-13T10:07:33Z"));
         when(influxDBClient.query(anyString(), any(QueryOptions.class)))
-                .thenAnswer(inv -> readings.stream());
-
-        HistoryResponse response = service.getHistory("room-1", 168);
-
-        assertThat(response.points()).isNotEmpty();
-        assertThat(response.points()).hasSizeLessThanOrEqualTo(cap);
-        assertThat(response.points().size()).isLessThan(readings.size());
-    }
-
-    @Test
-    @DisplayName("history returns an empty series when the room has no data")
-    void getHistory_noData_returnsEmptyPoints() {
-        when(influxDBClient.query(anyString(), any(QueryOptions.class)))
-                .thenAnswer(inv -> Stream.empty());
+                .thenAnswer(inv -> Stream.<Object[]>empty());
 
         HistoryResponse response = service.getHistory("room-1", 24);
 
-        assertThat(response.points()).isEmpty();
-        assertThat(response.start()).isBefore(response.end());
+        assertThat(response.points()).isNotEmpty();
+        // Every slot is emitted even with no data, and every one is an explicit gap.
+        assertThat(response.points()).allSatisfy(p -> {
+            assertThat(p.count()).isNull();
+            assertThat(p.confidence()).isEqualTo(0.0);
+        });
+        // Consecutive slots are exactly one 2-hour step apart (a clean, evenly spaced grid).
+        List<HistoryPoint> points = response.points();
+        for (int i = 1; i < points.size(); i++) {
+            assertThat(Duration.between(points.get(i - 1).time(), points.get(i).time()))
+                    .isEqualTo(Duration.ofHours(2));
+        }
+        assertThat(response.start()).isEqualTo(Instant.parse("2025-01-12T10:00:00Z"));
+    }
+
+    @Test
+    @DisplayName("history never returns more than max-points, however long the window")
+    void getHistory_longWindow_neverExceedsMaxPoints() {
+        int cap = 10;
+        ReflectionTestUtils.setField(service, "maxPoints", cap);
+        fixClockAt(Instant.parse("2025-01-13T10:00:00Z"));
+        when(influxDBClient.query(anyString(), any(QueryOptions.class)))
+                .thenAnswer(inv -> Stream.<Object[]>empty());
+
+        // 1000h window with a cap of 10 forces the slot width past the breakpoint table.
+        HistoryResponse response = service.getHistory("room-1", 1000);
+
+        assertThat(response.points()).isNotEmpty();
+        assertThat(response.points()).hasSizeLessThanOrEqualTo(cap); // grid start alignment must not overshoot the cap
     }
 
     @Test
