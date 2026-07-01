@@ -2,13 +2,18 @@ package com.occupi.feature.database;
 
 import java.math.BigInteger;
 import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
+import java.time.ZonedDateTime;
 
 /**
- * Converts the {@code time} column returned by InfluxDB 3 queries into {@link Instant}.
+ * Converts a timestamp column returned by InfluxDB 3 queries into {@link Instant}.
  *
- * The influxdb3-java client returns the timestamp as nanoseconds-since-epoch
- * (typically a {@link BigInteger}) rather than an {@link Instant}, so a plain
- * cast fails at runtime. This helper accepts the value defensively.
+ * The influxdb3-java client returns the raw {@code time} column as nanoseconds-since-epoch
+ * (typically a {@link BigInteger}), but SQL time functions such as {@code date_bin} return
+ * their timestamp column as a timezone-less {@link LocalDateTime} (the UTC wall-clock). A
+ * plain cast therefore fails at runtime, so this helper accepts every shape defensively.
  */
 public final class InfluxTime {
 
@@ -25,6 +30,17 @@ public final class InfluxTime {
         }
         if (value instanceof Instant instant) {
             return instant;
+        }
+        if (value instanceof OffsetDateTime odt) {
+            return odt.toInstant();
+        }
+        if (value instanceof ZonedDateTime zdt) {
+            return zdt.toInstant();
+        }
+        if (value instanceof LocalDateTime ldt) {
+            // date_bin (and other SQL time functions) return a timezone-less timestamp;
+            // InfluxDB stores and bins in UTC, so read the wall-clock as UTC.
+            return ldt.toInstant(ZoneOffset.UTC);
         }
         if (value instanceof BigInteger nanos) {
             return ofEpochNanos(nanos.longValueExact());
