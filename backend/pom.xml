@@ -146,6 +146,17 @@
 			<version>${influxdb3.version}</version>
 		</dependency>
 
+		<!-- In-memory caching (Caffeine) for the room-detail chart/forecast reads (#280).
+		     Keeps repeated/concurrent requests for the same room off the CPU-capped InfluxDB. -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-cache</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>com.github.ben-manes.caffeine</groupId>
+			<artifactId>caffeine</artifactId>
+		</dependency>
+
 		<!-- Mockito for TDD -->
 		<dependency>
 			<groupId>org.mockito</groupId>
