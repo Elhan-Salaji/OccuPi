@@ -2,11 +2,13 @@ package com.occupi.feature.forecast;
 
 import com.influxdb.v3.client.InfluxDBClient;
 import com.influxdb.v3.client.query.QueryOptions;
+import com.occupi.app.CacheConfig;
 import com.occupi.feature.database.InfluxTime;
 import com.occupi.feature.forecast.dto.ForecastPoint;
 import com.occupi.feature.forecast.dto.ForecastResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
@@ -39,6 +41,8 @@ public class ForecastServiceImpl implements ForecastService {
     }
 
     @Override
+    @Cacheable(cacheNames = CacheConfig.FORECAST, key = "#roomId + '@' + #forecastHours",
+            unless = "#result == null || #result.forecast().isEmpty()")
     public ForecastResponse forecast(String roomId, int forecastHours) {
         if (roomId == null || roomId.isBlank()) {
             throw new IllegalArgumentException("roomId must not be blank");
