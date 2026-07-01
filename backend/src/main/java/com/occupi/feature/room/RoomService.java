@@ -17,7 +17,11 @@ public interface RoomService {
     /** Returns a single room, or empty if it does not exist. */
     Optional<RoomResponse> getRoom(String roomId);
 
-    /** Creates a new room and returns it. */
+    /**
+     * Creates a new room and returns it.
+     *
+     * @throws RoomAlreadyExistsException if a room with the given roomId already exists
+     */
     RoomResponse createRoom(RoomRequest request);
 
     /**
