@@ -2,12 +2,14 @@ package com.occupi.feature.forecast;
 
 import com.influxdb.v3.client.InfluxDBClient;
 import com.influxdb.v3.client.query.QueryOptions;
+import com.occupi.app.CacheConfig;
 import com.occupi.feature.chart.TimeSlots;
 import com.occupi.feature.database.InfluxTime;
 import com.occupi.feature.forecast.dto.ForecastPoint;
 import com.occupi.feature.forecast.dto.ForecastResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 
 import java.time.Clock;
@@ -31,6 +33,9 @@ import java.util.stream.Stream;
  * source hour is off by one for the affected week; making the fold DST-aware (calendar
  * weeks in a business zone) is a deliberate follow-up, kept out of #278 to preserve the
  * "same grid as history" guarantee.
+ *
+ * <p>Results are cached per {@code roomId@forecastHours} (#280); the cache is short-lived
+ * so a room that just received data is not stuck on a stale forecast.
  */
 @Slf4j
 @Service
@@ -66,6 +71,8 @@ public class ForecastServiceImpl implements ForecastService {
     }
 
     @Override
+    @Cacheable(cacheNames = CacheConfig.FORECAST, key = "#roomId + '@' + #forecastHours",
+            unless = "#result == null || #result.forecast().?[predictedCount != null].isEmpty()")
     public ForecastResponse forecast(String roomId, int forecastHours) {
         if (roomId == null || roomId.isBlank()) {
             throw new IllegalArgumentException("roomId must not be blank");
