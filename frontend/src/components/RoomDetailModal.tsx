@@ -6,6 +6,7 @@ import { WeekPatternHeatmap } from "./WeekPatternHeatmap"
 import { useRoomStore} from "../hooks/useRoomStore";
 import { Clock } from 'lucide-react';
 import { ErrorBoundary} from "./ErrorBoundary";
+import { MOCK_HISTORY, MOCK_FORECAST, MOCK_WEEKPATTERN } from "../utils/mockData";
 
 interface RoomDetailModalProps {
   room: Room;
@@ -20,11 +21,41 @@ export const RoomDetailModal = ({room, isOpen, onClose}: RoomDetailModalProps) =
     const [timeRange, setTimeRange] = useState(24);
     const liveRoom = useRoomStore(state => state.rooms.find(r => r.roomId === room.roomId)) ?? room;
 
+    const [isLoading, setIsLoading] = useState(true);
+    const [usingMockData, setUsingMockData] = useState ({ history: false, forecast: false, weekPattern: false});
+
+    const isEmpty =
+        history?.points.length === 0 &&
+        forecast?.forecast.length === 0 &&
+        weekPattern?.pattern.length === 0;
+
     useEffect(() => {
         if (!isOpen) return;
-        fetchHistory(room.roomId, timeRange).then(setHistory);
-        fetchForecast(room.roomId,timeRange).then(setForecast);
-        fetchWeekPattern(room.roomId).then(setWeekPattern);
+        setIsLoading(true);
+        setHistory(null);
+        setForecast(null);
+        setWeekPattern(null);
+        setUsingMockData({ history: false, forecast: false, weekPattern: false});
+
+        Promise.all([
+            fetchHistory(room.roomId, timeRange).catch(() => {
+                setUsingMockData(prev => ({ ...prev,history: true}));
+                return MOCK_HISTORY;
+            }),
+            fetchForecast(room.roomId, timeRange).catch(() => {
+                setUsingMockData(prev => ({ ...prev,forecast: true}));
+                return MOCK_FORECAST;
+            }),
+            fetchWeekPattern(room.roomId).catch(() => {
+                setUsingMockData(prev => ({ ...prev,weekPattern: true}));
+                return MOCK_WEEKPATTERN;
+            }),
+        ]).then(([historyData, forecastData, weekPatternData]) => {
+            setHistory(historyData);
+            setForecast(forecastData);
+            setWeekPattern(weekPatternData);
+            setIsLoading(false);
+        });
     }, [room?.roomId, timeRange, isOpen]);
 
     useEffect(() => {
@@ -70,42 +101,81 @@ export const RoomDetailModal = ({room, isOpen, onClose}: RoomDetailModalProps) =
                     </div>
                 </div>
 
-                {/* Occupancy Chart */}
-                <ErrorBoundary>
-                    {history && forecast && (
+                {/* Mock-Data Banner*/}
+                {(usingMockData.history || usingMockData.forecast || usingMockData.weekPattern)  && (
+                    <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-sm text-yellow-800">
+                        Keine Live-Daten verfügbar - Beispieldaten werden angezeigt
+                    </div>
+                )}
+
+                {isLoading ? (
+                    <>
+                        {/* Chart-Skeleton */}
                         <div className="mb-6">
                             <div className="flex items-center justify-between mb-2">
-                                <h3 className="text-lg font-semibold"> Verlauf & Prognose</h3>
+                                <div className="h-6 w-48 bg-gray-100 rounded animate-pulse" />
                                 <div className="flex gap-1">
                                     {[1, 3, 12, 24, 168].map(h => (
-                                        <button key={h} onClick={() => setTimeRange(h)}
-                                        className={`px-3 py-1 text-sm rounded-lg ${timeRange === h ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
-                                            {h === 168 ? '1W' : `${h}h`}
-                                        </button>
+                                        <div key={h} className="h-7 w-10 bg-gray-100 rounded-lg animate-pulse" />
                                     ))}
                                 </div>
                             </div>
-                            <OccupancyChart historyPoints={history.points} forecastPoints={forecast.forecast} capacity={room.capacity} />
-                            {forecast.forecast.length === 0 ? (
-                                <p className="text-sm text-gray-400 mt-1 flex items-center gap-1">
-                                    <Clock className="w-4 h-4"/> Prognose benötigt mehr Daten
-                                </p>
-                            ) : (
-                            <p className="text-sm text-gray-400 mt-1">Backend-Forecast · Konfidenz {Math.round(forecast.confidence * 100)}%</p>
-                                )}
+                            <div className="h-[300px] bg-gray-100 rounded-lg animate-pulse" />
                         </div>
-                    )}
-                </ErrorBoundary>
-
-                {/* Weekly Pattern Heatmap */}
-                <ErrorBoundary>
-                    {weekPattern && (
+                        {/* Heatmap-Skeleton */}
                         <div>
-                            <h3 className="text-lg font-semibold mb-2"> Wochenmuster (Ø der letzten {weekPattern.weeks} Wochen)</h3>
-                            <WeekPatternHeatmap pattern={weekPattern.pattern} peakTime={weekPattern.peakTime} quietTime={weekPattern.quietTime} />
+                            <div className="h-6 w-64 bg-gray-100 rounded animate-pulse mb-2" />
+                            <div className="h-48 bg-gray-100 rounded-lg animate-pulse mb-4" />
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="h-20 bg-gray-100 rounded-lg animate-pulse" />
+                                <div className="h-20 bg-gray-100 rounded-lg animate-pulse" />
+                            </div>
                         </div>
-                    )}
-                </ErrorBoundary>
+                    </>
+                    ) : isEmpty ? (
+                        <div className="py-16 text-center text-gray-400">
+                            Noch keine Daten für diesen Raum vorhanden
+                        </div>
+                    ) : (
+                        <>
+                        {/* Occupancy Chart */}
+                        <ErrorBoundary>
+                            {history && forecast && (
+                                <div className="mb-6">
+                                    <div className="flex items-center justify-between mb-2">
+                                        <h3 className="text-lg font-semibold"> Verlauf & Prognose</h3>
+                                        <div className="flex gap-1">
+                                            {[1, 3, 12, 24, 168].map(h => (
+                                                <button key={h} onClick={() => setTimeRange(h)}
+                                                className={`px-3 py-1 text-sm rounded-lg ${timeRange === h ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
+                                                    {h === 168 ? '1W' : `${h}h`}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                    <OccupancyChart historyPoints={history.points} forecastPoints={forecast.forecast} capacity={room.capacity} />
+                                    {forecast.forecast.length === 0 ? (
+                                        <p className="text-sm text-gray-400 mt-1 flex items-center gap-1">
+                                            <Clock className="w-4 h-4"/> Prognose benötigt mehr Daten
+                                        </p>
+                                    ) : (
+                                    <p className="text-sm text-gray-400 mt-1">Backend-Forecast · Konfidenz {Math.round(forecast.confidence * 100)}%</p>
+                                        )}
+                                </div>
+                            )}
+                        </ErrorBoundary>
+
+                        {/* Weekly Pattern Heatmap */}
+                        <ErrorBoundary>
+                            {weekPattern && (
+                                <div>
+                                    <h3 className="text-lg font-semibold mb-2"> Wochenmuster (Ø der letzten {weekPattern.weeks} Wochen)</h3>
+                                    <WeekPatternHeatmap pattern={weekPattern.pattern} peakTime={weekPattern.peakTime} quietTime={weekPattern.quietTime} />
+                                </div>
+                            )}
+                        </ErrorBoundary>
+                    </>
+                )}
 
 
             </div>
