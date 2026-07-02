@@ -250,6 +250,11 @@ Two things are **not** the mock toggle:
   `/api/occupancy/all` return nothing or error, the dashboard shows example rooms and a
   "mock data" banner. It never writes to the backend, and it's unrelated to `SENSOR_MODE`.
 
+For the **server demo** there is a third source: `deploy/seed-demo-data.py` rewrites
+the InfluxDB `occupancy` table with eight weeks of shaped history and one room per
+dashboard edge case (over-capacity, chart gaps, stale timestamp, night-only use, …),
+then restarts the backend. See [deploy/README.md](deploy/README.md#demo-data-seed) (#300).
+
 ## Running on the server (production)
 
 The production host (`occupi.mi.hdm-stuttgart.de`, a Debian VM) runs the same stack with
