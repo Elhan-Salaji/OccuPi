@@ -229,7 +229,7 @@ class MetricsRepositoryTest {
     class FindAllLatest {
 
         @Test
-        @DisplayName("should serve all rows from the last value cache without scanning")
+        @DisplayName("should union the bounded scan with the last value cache")
         void shouldMapAllRows() {
             Instant ts = Instant.parse("2026-06-14T10:00:00Z");
             when(influxDBClient.query(anyString(), any(QueryOptions.class)))
@@ -246,9 +246,12 @@ class MetricsRepositoryTest {
             assertEquals(50, result.get(1).getSent());
 
             ArgumentCaptor<String> sqlCaptor = ArgumentCaptor.forClass(String.class);
-            verify(influxDBClient).query(sqlCaptor.capture(), any(QueryOptions.class));
-            assertTrue(sqlCaptor.getValue().contains("last_cache('metrics'"),
-                    "a warm cache must satisfy the read without a second query");
+            verify(influxDBClient, times(2)).query(sqlCaptor.capture(), any(QueryOptions.class));
+            assertTrue(sqlCaptor.getAllValues().get(0).contains("time >="),
+                    "the scan must constrain the window with a time predicate, "
+                            + "otherwise it reads the entire measurement history");
+            assertTrue(sqlCaptor.getAllValues().get(1).contains("last_cache('metrics'"),
+                    "the cache read must complement the scan");
         }
 
         @Test
@@ -261,18 +264,23 @@ class MetricsRepositoryTest {
         }
 
         @Test
-        @DisplayName("should fall back to a time-bounded scan when the cache is empty (guards #273)")
-        void shouldBoundScanByTime() {
+        @DisplayName("should keep cache-only sensors and prefer the newer row per sensor")
+        void shouldMergeCacheAndScanRows() {
+            Instant older = Instant.parse("2026-06-14T10:00:00Z");
+            Instant newer = Instant.parse("2026-06-14T12:00:00Z");
             when(influxDBClient.query(anyString(), any(QueryOptions.class)))
-                    .thenAnswer(inv -> Stream.empty());
+                    .thenAnswer(inv -> Stream.<Object[]>of(
+                            row("sensor-A", 42.0, 60.0, 3L, 100L, 1L, 12.5, older)))
+                    .thenAnswer(inv -> Stream.<Object[]>of(
+                            row("sensor-A", 45.0, 61.0, 4L, 110L, 1L, 13.0, newer),
+                            row("sensor-B", 10.0, 30.0, 0L, 50L, 0L, 8.0, older)));
 
-            repository.findAllLatest();
+            List<MetricsData> result = repository.findAllLatest();
 
-            ArgumentCaptor<String> sqlCaptor = ArgumentCaptor.forClass(String.class);
-            verify(influxDBClient, times(2)).query(sqlCaptor.capture(), any(QueryOptions.class));
-            assertTrue(sqlCaptor.getAllValues().get(1).contains("time >="),
-                    "the fallback scan must constrain the window with a time predicate, "
-                            + "otherwise it reads the entire measurement history");
+            assertEquals(2, result.size());
+            assertEquals(110, result.get(0).getSent());
+            assertEquals(newer, result.get(0).getTimestamp());
+            assertEquals("sensor-B", result.get(1).getSensorId());
         }
 
         @Test
@@ -290,13 +298,13 @@ class MetricsRepositoryTest {
         }
 
         @Test
-        @DisplayName("should fall back to the bounded scan when the cache is not readable")
+        @DisplayName("should tolerate an unreadable cache and return the scan rows")
         void shouldFallBackWhenCacheReadFails() {
             Instant ts = Instant.parse("2026-06-14T10:00:00Z");
             when(influxDBClient.query(anyString(), any(QueryOptions.class)))
-                    .thenThrow(new RuntimeException("could not find cache"))
                     .thenAnswer(inv -> Stream.<Object[]>of(
-                            row("sensor-A", 42.0, 60.0, 3L, 100L, 1L, 12.5, ts)));
+                            row("sensor-A", 42.0, 60.0, 3L, 100L, 1L, 12.5, ts)))
+                    .thenThrow(new RuntimeException("could not find cache"));
 
             List<MetricsData> result = repository.findAllLatest();
 

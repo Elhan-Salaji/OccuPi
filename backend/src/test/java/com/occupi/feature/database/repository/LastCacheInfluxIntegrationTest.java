@@ -4,6 +4,7 @@ import com.influxdb.v3.client.InfluxDBClient;
 import com.influxdb.v3.client.query.QueryOptions;
 import com.occupi.feature.database.config.InfluxDBProperties;
 import com.occupi.feature.database.config.InfluxLastCacheInitializer;
+import com.occupi.feature.database.model.MetricsData;
 import com.occupi.feature.database.model.OccupancyData;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -103,15 +104,23 @@ class LastCacheInfluxIntegrationTest {
 
     @Test
     @Order(2)
-    @DisplayName("creates the caches via the management API; a second run is idempotent (409)")
+    @DisplayName("creates both caches via the management API; re-running is safe")
     void cacheCreationIsIdempotent() {
-        assertDoesNotThrow(initializer::createLastCaches);
+        // InfluxDB creates tables lazily on first write — without this row the
+        // metrics cache creation would 404 (no metrics test writes otherwise).
+        new MetricsRepository(client).save(MetricsData.builder()
+                .sensorId("it-sensor").cpuPercentage(10.0).memoryPercentage(20.0)
+                .queueSize(0).sent(1).dropped(0).avgProcessTime(1.0f)
+                .timestamp(Instant.now()).build());
+
+        initializer.createLastCaches();
         assertDoesNotThrow(initializer::createLastCaches);
 
         try (Stream<Object[]> rows =
                      client.query("SELECT * FROM system.last_caches", QueryOptions.defaultQueryOptions())) {
             List<String> cells = rows.flatMap(Arrays::stream).map(String::valueOf).toList();
-            assertThat(cells).contains(OccupancyRepository.LAST_CACHE_NAME);
+            assertThat(cells).contains(OccupancyRepository.LAST_CACHE_NAME,
+                    MetricsRepository.LAST_CACHE_NAME);
         }
     }
 
