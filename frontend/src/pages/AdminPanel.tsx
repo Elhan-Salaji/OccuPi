@@ -2,6 +2,7 @@ import { useState, useCallback } from 'react';
 import { Pencil, Trash2 } from 'lucide-react';
 import api from '../utils/api';
 import { createRoom, updateRoom, deleteRoom} from "../utils/api";
+import { MetricsSection} from "../components/MetricsSection";
 import type { RoomResponse } from '../types/room';
 
 const emptyForm = { roomId: '', name: '', building: '', floor: 0, capacity: 0};
@@ -234,10 +235,7 @@ const AdminPanel = () => {
             )}
 
             {/* Metrics Placeholder #224 */}
-            <section className="bg-white rounded-xl shadow p-6">
-                <h2 className="text-xl font-semibold text-gray-900 mb-2">Pi Metrics</h2>
-                <p className="text-gray-400">Coming soon with Issue #224</p>
-            </section>
+            <MetricsSection />
         </div>
     );
 };
