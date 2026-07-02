@@ -19,13 +19,14 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   live occupancy for room 137 (#201).
 
 ### Changed
-- InfluxDB now runs with `--query-file-limit 8192` (default 432) in the base compose
-  command. InfluxDB 3 Core never compacts its 10-minute gen1 parquet files, so at
-  ~100 files per table and day the default limit rejected every read wider than
-  ~4 days — the 8-week week-pattern chart alone needs ~5,600 files at steady state.
+- InfluxDB now runs with `--query-file-limit 10000` (default 432) in the base compose
+  command. InfluxDB 3 Core never compacts its 10-minute gen1 parquet files (up to 144
+  per table and day), so the default limit rejected every read wider than ~3–4 days —
+  the 8-week week-pattern chart alone needs up to ~8,064 files at full write cadence.
   The raise is safe on this host: the files are ~7 KB each and the #273 CPU/memory
   caps stay on as backstop. Auto-deploy leaves infra containers alone, so applying
   it needs a manual `docker compose ... up -d influxdb` (#294).
+- The InfluxDB container now runs under a hard resource ceiling in the production
   compose (0.5 CPU, 2 GiB memory) so one heavy query can never starve the single-core
   host again. InfluxDB 3 Core does not cancel a running query when the client
   disconnects, so this cap is the backstop that keeps the box reachable. Auto-deploy
