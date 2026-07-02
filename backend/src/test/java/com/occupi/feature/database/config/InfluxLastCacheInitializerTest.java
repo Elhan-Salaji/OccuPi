@@ -130,7 +130,7 @@ class InfluxLastCacheInitializerTest {
         when(response.statusCode()).thenReturn(500, 500, 201, 201);
         lenient().when(response.body()).thenReturn("");
         when(httpClient.send(any(HttpRequest.class), any()))
-                .thenReturn(response);
+                .thenAnswer(inv -> response);
 
         initializer.createLastCaches();       // both fail (500)
         initializer.retryMissingLastCaches(); // both succeed (201)
