@@ -22,7 +22,13 @@ import java.util.stream.Stream;
 @RequiredArgsConstructor
 public class MetricsRepository {
 
-    static final String MEASUREMENT_NAME = "metrics";
+    public static final String MEASUREMENT_NAME = "metrics";
+
+    /** Name of the InfluxDB last value cache serving the latest-per-sensor reads (#294). */
+    public static final String LAST_CACHE_NAME = "metrics_latest_by_sensor";
+
+    /** Tag column the last value cache is keyed by: one cached row per sensor. */
+    public static final String LAST_CACHE_KEY_COLUMN = "sensorId";
 
     /** Column list shared by every read query; order must match {@link #toMetricsData}. */
     private static final String SELECT_COLUMNS =
