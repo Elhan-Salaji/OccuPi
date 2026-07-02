@@ -182,6 +182,12 @@ class ChartServiceImplTest {
         assertThatIllegalArgumentException().isThrownBy(() -> service.getHistory("room-1", 0));
     }
 
+    @Test
+    @DisplayName("history throws on hours beyond the cap (guards the parquet file limit, #294)")
+    void getHistory_hoursBeyondCap_throws() {
+        assertThatIllegalArgumentException().isThrownBy(() -> service.getHistory("room-1", 169));
+    }
+
     // ---------- weekpattern ----------
 
     @Test
@@ -276,5 +282,11 @@ class ChartServiceImplTest {
     @DisplayName("weekpattern throws on non-positive weeks")
     void getWeekPattern_zeroWeeks_throws() {
         assertThatIllegalArgumentException().isThrownBy(() -> service.getWeekPattern("room-1", 0));
+    }
+
+    @Test
+    @DisplayName("weekpattern throws on weeks beyond the cap (guards the parquet file limit, #294)")
+    void getWeekPattern_weeksBeyondCap_throws() {
+        assertThatIllegalArgumentException().isThrownBy(() -> service.getWeekPattern("room-1", 9));
     }
 }
