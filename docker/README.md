@@ -76,6 +76,29 @@ docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d influxdb
 docker inspect occupi-influxdb3 -f 'nanocpus={{.HostConfig.NanoCpus}} mem={{.HostConfig.Memory}}'
 ```
 
+### InfluxDB query file limit
+InfluxDB 3 Core writes a new parquet file per table roughly every 10 minutes and — unlike
+Enterprise — never compacts them, so long-lived instances accumulate ~100 files per day
+and table. Core refuses any query that would open more than `--query-file-limit` files
+(default 432 ≈ 3 days): that broke the dashboard's latest-per-room read and the week-pattern
+chart once enough history existed (#294).
+
+Two-part mitigation: the *latest* reads now come from InfluxDB's in-memory **last value
+cache** (created by the backend at startup, no parquet involved), and the remaining
+analytic reads run under a raised `--query-file-limit 8192` in the base compose command —
+wide enough for the 8-week week-pattern, and safe here because our files are tiny (~7 KB)
+and the prod resource cap above bounds worst-case memory/CPU. The backend additionally
+caps every client-controlled window (history/forecast ≤ 168 h, week-pattern ≤ 8 weeks) so
+no request can exceed the limit.
+
+Like the resource cap, the flag needs a one-time manual `up -d influxdb` (auto-deploy
+leaves infra containers alone):
+```bash
+cd docker
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d influxdb
+docker inspect occupi-influxdb3 -f '{{.Config.Cmd}}' | grep -o 'query-file-limit [0-9]*'
+```
+
 ### Host Nginx (already present on the server)
 The reverse proxy lives on the host (not in Compose). The versioned config is
 [`../deploy/nginx/occupi.conf`](../deploy/nginx/occupi.conf):
