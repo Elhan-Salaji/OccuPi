@@ -8,6 +8,16 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 ### Added
+- The Pi sender has a demo mode (`SENSOR_MODE=demo`, compose profile `demo`) for the
+  live dashboard demo: one hardware-free container walks the configured rooms
+  (`DEMO_ROOMS`, `roomId:capacity` pairs) through the traffic-light bands in small
+  steps, occasionally overshoots capacity for a few minutes to trigger the
+  over-capacity pulse (#244), and emits synthetic Pi-health snapshots — one healthy,
+  one warning, one critical sensor — for the admin metrics section (#224). Everything
+  goes over the regular STOMP path at moderate rates (15 s occupancy / 45 s metrics
+  by default), so the frontend updates live without a reload and InfluxDB stays
+  inside the parquet-file-limit guidance from #294. Without a `.env` the demo
+  container defaults straight to the production endpoint (#297).
 - Occupancy history and weekly-pattern REST endpoints for the room detail view:
   `GET /api/occupancy/history` returns the recent time series (raw points within 24h,
   downsampled to 30-minute slots beyond that), and `GET /api/occupancy/weekpattern`

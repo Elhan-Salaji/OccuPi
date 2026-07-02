@@ -17,3 +17,6 @@ Dockerfile
 compose.yml
 README.md
 run.sh
+tests/
+pytest.ini
+requirements-dev.txt
