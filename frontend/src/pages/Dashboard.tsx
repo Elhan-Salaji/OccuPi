@@ -19,7 +19,7 @@ export default function Dashboard() {
         <div className="max-w-7xl mx-auto">
             <header className="mb-8 flex justify-between items-start">
                 <div>
-                    <h1 className="text-3xl font-bold text-gray-900">Live-Belegung</h1>
+                    <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
                     <p className="text-gray-500">Echtzeit-Daten der mmWave-Sensoren (HdM Campus)</p>
                 </div>
                 <div className="flex items-center gap-2 text-sm">
