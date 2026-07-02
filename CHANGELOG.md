@@ -19,6 +19,13 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   live occupancy for room 137 (#201).
 
 ### Changed
+- InfluxDB now runs with `--query-file-limit 10000` (default 432) in the base compose
+  command. InfluxDB 3 Core never compacts its 10-minute gen1 parquet files (up to 144
+  per table and day), so the default limit rejected every read wider than ~3–4 days —
+  the 8-week week-pattern chart alone needs up to ~8,064 files at full write cadence.
+  The raise is safe on this host: the files are ~7 KB each and the #273 CPU/memory
+  caps stay on as backstop. Auto-deploy leaves infra containers alone, so applying
+  it needs a manual `docker compose ... up -d influxdb` (#294).
 - The InfluxDB container now runs under a hard resource ceiling in the production
   compose (0.5 CPU, 2 GiB memory) so one heavy query can never starve the single-core
   host again. InfluxDB 3 Core does not cancel a running query when the client
@@ -34,6 +41,19 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   computation, with short per-endpoint TTLs and a bounded cache size (#280).
 
 ### Fixed
+- The dashboard's "latest per room / per sensor" reads work again and no longer
+  depend on parquet files at all: they are served from InfluxDB's in-memory last
+  value cache, which the backend creates idempotently at startup (key `roomId` /
+  `sensorId`, TTL = `*.latest-lookback-days`). The former 7-day window-function
+  scan started failing InfluxDB 3 Core's 432-parquet-file query limit once ~4 days
+  of gen1 files had accumulated — `GET /api/occupancy/all` returned 500 and every
+  room except the live-streaming 137 showed as unavailable. While the cache is
+  cold right after an InfluxDB restart, a scan bounded to
+  `*.latest-fallback-days` (default 2) fills the gap; the previously unbounded
+  single-room reads now use the same bounded fallback. Client-controlled windows
+  are capped server-side (history/forecast ≤ 168 h, week-pattern ≤ 8 weeks,
+  metrics history ≤ `metrics.history-max-days`) so a single request can never
+  exceed the file limit (#294).
 - `POST /api/rooms` now rejects a create whose `roomId` already exists with
   `409 Conflict` instead of silently overwriting the stored room. Rooms use an
   assigned ID, so `save()` on a duplicate acted as an update and corrupted the

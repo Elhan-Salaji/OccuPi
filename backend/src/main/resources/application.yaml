@@ -26,14 +26,20 @@ influxdb:
   database: occupi
   token: ""
 
-# "Latest per room / per sensor" reads only scan this many days back, so the
-# InfluxDB window-function query never walks the full measurement history. An
-# unbounded scan pinned the single-core server CPU and crashed it once a large
-# amount of data had accumulated (#273).
+# "Latest per room / per sensor" reads are the union of InfluxDB's in-memory last
+# value cache (#294) — latest-lookback-days is that cache's TTL — and a scan
+# bounded to latest-fallback-days, which restores rooms the cache lost across an
+# InfluxDB restart. The scan window is kept short because a wider scan pinned the
+# single-core server CPU (#273) and now exceeds InfluxDB's parquet file limit at
+# roughly three to four days' worth of files. history-max-days clamps how far back
+# the metrics history endpoint may reach, for the same reason.
 occupancy:
   latest-lookback-days: 7
+  latest-fallback-days: 2
 metrics:
   latest-lookback-days: 7
+  latest-fallback-days: 2
+  history-max-days: 7
 
 # Caches for the room-detail reads (history / forecast / week-pattern). These results
 # are identical for every viewer of a room and change slowly, so a short-lived cache

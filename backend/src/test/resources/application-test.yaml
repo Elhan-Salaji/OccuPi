@@ -12,6 +12,12 @@ spring:
       ddl-auto: create-drop
     open-in-view: false
 
+# Full-context tests must not reach out to a real InfluxDB (or create caches on a
+# developer's running compose stack as a side effect).
+influxdb:
+  last-cache:
+    enabled: false
+
 logging:
   level:
     com.occupi: DEBUG
