@@ -45,11 +45,19 @@ services:
     restart: unless-stopped
 
   influxdb:
-    image: influxdb:3-core
+    # Pinned: the floating 3-core tag drifted from 3.9.x to 3.10.x and CI suddenly
+    # tested a different version than prod runs. The integration tests pin the same
+    # tag — bump both together, deliberately (#294).
+    image: influxdb:3.9.3-core
     container_name: occupi-influxdb3
     environment:
       - INFLUXDB3_HOST_ID=occupi-prod
-    command: serve --host-id occupi-prod --http-bind 0.0.0.0:8181 --object-store file --data-dir /var/lib/influxdb3 --without-auth
+    # --query-file-limit: Core never compacts its 10-minute gen1 parquet files (up to
+    # 144 per table and day), so wide reads exceed the default limit of 432 and fail
+    # outright — the 8-week week-pattern needs up to ~8,064 files at full write cadence
+    # (#294). 10000 leaves headroom above that worst case; our files are tiny (~7 KB),
+    # and in prod the #273 CPU/memory caps bound the blast radius.
+    command: serve --host-id occupi-prod --http-bind 0.0.0.0:8181 --object-store file --data-dir /var/lib/influxdb3 --without-auth --query-file-limit 10000
     volumes:
       - influxdb3-data:/var/lib/influxdb3
     healthcheck:

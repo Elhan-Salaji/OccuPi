@@ -69,7 +69,9 @@ public class MetricsProviderController {
      *
      * @param sensorId the sensor identifier
      * @param since    the start of the window as an ISO-8601 UTC instant
-     *                 (e.g. {@code 2026-06-14T10:00:00Z})
+     *                 (e.g. {@code 2026-06-14T10:00:00Z}); reaches at most
+     *                 {@code metrics.history-max-days} (default 7) back — older
+     *                 values are clamped, not rejected (#294)
      * @return 200 OK with a list of {@link MetricsResponse}, or 400 if sensorId is
      *         blank or {@code since} is not a parseable instant
      */

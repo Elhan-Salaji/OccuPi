@@ -16,13 +16,14 @@ from config import (
     QUEUE_MAX_SIZE,
     WS_RECONNECT_DELAY, WS_MAX_RETRIES, BACKEND_WS_PATH,
     BACKEND_TLS, BACKEND_TLS_CA,
-    SENSOR_MODE, SENSOR_ID, ROOM_ID, MOCK_ROOM_IDS,
+    SENSOR_MODE, SENSOR_ID, ROOM_ID, MOCK_ROOM_IDS, DEMO_ROOMS,
     USE_VISUALIZER, VISUALIZER_MAX_FPS,
 )
 from sensor.receiver import open_ports, send_config, read_frame, CONFIG_FILE
 from sensor.metrics import ThroughputMetrics, start_metrics_monitor
 from sender.processor import map_to_occupancy
 from mock_data import mock_sensor_loop
+from demo_data import SentCounters, demo_sensor_loop, parse_rooms, start_demo_metrics
 from stomp import exception as stomp_exception
 
 # Logging configuration
@@ -33,9 +34,16 @@ logging.basicConfig(
 )
 log = logging.getLogger(__name__)
 
-# Size the queue for the workload: in multi-room mock the generator enqueues one
-# frame per room each tick, so the queue must hold more than the room count.
-_queue: queue.Queue = queue.Queue(maxsize=max(QUEUE_MAX_SIZE, len(MOCK_ROOM_IDS) * 3))
+# Parsed once at import: a malformed DEMO_ROOMS fails fast at startup instead
+# of mid-demo, and the queue below can be sized for the room count.
+DEMO_ROOM_SPECS = parse_rooms(DEMO_ROOMS) if SENSOR_MODE == "demo" else []
+
+# Size the queue for the workload: in multi-room mock and demo the generator
+# enqueues one frame per room each tick, so the queue must hold more than the
+# room count.
+_queue: queue.Queue = queue.Queue(
+    maxsize=max(QUEUE_MAX_SIZE, len(MOCK_ROOM_IDS) * 3, len(DEMO_ROOM_SPECS) * 3)
+)
 _metrics = ThroughputMetrics()
 
 # Shared STOMP connection, owned by the sender loop. The metrics thread reads it
@@ -131,16 +139,17 @@ def start_sender() -> None:
     log.info("Sender thread started.")
 
 
-def _send_metrics(snapshot: dict) -> None:
+def _send_metrics(snapshot: dict, sensor_id: str = SENSOR_ID) -> None:
     """Forwards a metrics snapshot to the backend over the shared STOMP link (#110).
     Tags it with the sensorId and a UTC timestamp, sent explicitly so the backend
-    does not have to assign one (see #186). Skips the send when the link is down."""
+    does not have to assign one (see #186). Skips the send when the link is down.
+    Demo mode passes per-room sensor ids; everything else reports as SENSOR_ID."""
     conn = _conn
     if conn is None or not conn.is_connected():
         log.debug("STOMP not connected, skipping metrics snapshot.")
         return
     payload = {
-        "sensorId": SENSOR_ID,
+        "sensorId": sensor_id,
         **snapshot,
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }
@@ -162,9 +171,23 @@ if __name__ == '__main__':
 
     try:
         start_sender()
-        start_metrics_monitor(_queue, _metrics, send_fn=_send_metrics)
+        # In demo mode the backend gets the scripted per-sensor health instead —
+        # the real psutil snapshot would sit next to the demo sensors as one
+        # always-green entry. The local metrics log line stays on in every mode.
+        start_metrics_monitor(
+            _queue, _metrics,
+            send_fn=None if SENSOR_MODE == "demo" else _send_metrics,
+        )
 
-        if SENSOR_MODE == "mock":
+        if SENSOR_MODE == "demo":
+            log.info(
+                "Starting in DEMO mode, scripted dashboard scenario for %d room(s).",
+                len(DEMO_ROOM_SPECS),
+            )
+            counters = SentCounters()
+            start_demo_metrics(DEMO_ROOM_SPECS, counters, send_fn=_send_metrics)
+            demo_sensor_loop(enqueue_frame, DEMO_ROOM_SPECS, counters)  # runs until stopped
+        elif SENSOR_MODE == "mock":
             rooms = MOCK_ROOM_IDS or [ROOM_ID]
             log.info("Starting in MOCK mode, fake occupancy for %d room(s).", len(rooms))
             mock_sensor_loop(enqueue_frame, rooms)  # runs until the process is stopped
