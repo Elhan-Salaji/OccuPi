@@ -8,6 +8,16 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 ### Added
+- Server-side demo data seed (`deploy/seed-demo-data.py`): drops and rewrites the
+  InfluxDB `occupancy` table with eight weeks of 5-minute occupancy history — as
+  backfill for the live demo rooms and shaped per dashboard edge case for the static
+  ones (over-capacity ring, empty room, stale timestamp, >500 points in 24 h for
+  downsampling, chart gaps with reduced forecast confidence, a night-only room
+  without a quiet time, all-empty states, the historical 7/0 case). The script
+  upserts the matching Postgres rooms, recreates the `occupancy_latest_by_room`
+  cache and restarts the backend so its caches match the new table; the `metrics`
+  table and room 137's registry entry stay untouched. Meant to be re-run before
+  each demo (#300).
 - The Pi sender has a demo mode (`SENSOR_MODE=demo`, compose profile `demo`) for the
   live dashboard demo: one hardware-free container walks the configured rooms
   (`DEMO_ROOMS`, `roomId:capacity` pairs) through the traffic-light bands in small
