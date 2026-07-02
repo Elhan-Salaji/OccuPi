@@ -152,6 +152,9 @@ class ChartServiceImplTest {
     void getHistory_longWindow_neverExceedsMaxPoints() {
         int cap = 10;
         ReflectionTestUtils.setField(service, "maxPoints", cap);
+        // Lift the request cap (#294): this test needs a window far beyond it to
+        // push the slot width past the breakpoint table.
+        ReflectionTestUtils.setField(service, "maxHours", 1000);
         fixClockAt(Instant.parse("2025-01-13T10:00:00Z"));
         when(influxDBClient.query(anyString(), any(QueryOptions.class)))
                 .thenAnswer(inv -> Stream.<Object[]>empty());
@@ -180,6 +183,12 @@ class ChartServiceImplTest {
     @DisplayName("history throws on non-positive hours")
     void getHistory_zeroHours_throws() {
         assertThatIllegalArgumentException().isThrownBy(() -> service.getHistory("room-1", 0));
+    }
+
+    @Test
+    @DisplayName("history throws on hours beyond the cap (guards the parquet file limit, #294)")
+    void getHistory_hoursBeyondCap_throws() {
+        assertThatIllegalArgumentException().isThrownBy(() -> service.getHistory("room-1", 169));
     }
 
     // ---------- weekpattern ----------
@@ -276,5 +285,11 @@ class ChartServiceImplTest {
     @DisplayName("weekpattern throws on non-positive weeks")
     void getWeekPattern_zeroWeeks_throws() {
         assertThatIllegalArgumentException().isThrownBy(() -> service.getWeekPattern("room-1", 0));
+    }
+
+    @Test
+    @DisplayName("weekpattern throws on weeks beyond the cap (guards the parquet file limit, #294)")
+    void getWeekPattern_weeksBeyondCap_throws() {
+        assertThatIllegalArgumentException().isThrownBy(() -> service.getWeekPattern("room-1", 9));
     }
 }

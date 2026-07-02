@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import { useRoomStore } from '../hooks/useRoomStore';
 import { StatusBadge, OccupancyBar } from '../components/RoomStatus';
 import { RoomDetailModal} from "../components/RoomDetailModal";
-import { useFetchRooms } from '../hooks/useFetchRooms';
 import { PinButton } from "../components/PinButton";
 import type { Room } from '../types/room';
 import React from 'react';
@@ -37,7 +36,6 @@ function formatTime(timestamp: string) {
 export default function Rooms(){
     const { rooms } = useRoomStore();
     const [, setTick] = useState(0);
-    useFetchRooms();
     const [selectedRoom, setSelectedRoom] = useState<Room | null>(null);
 
     useEffect(() => {

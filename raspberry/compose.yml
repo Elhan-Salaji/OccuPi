@@ -7,6 +7,7 @@
 #
 #   Start (one sensor):  docker compose up -d --build
 #   Two sensors:         docker compose --profile second-sensor up -d --build
+#   Dashboard demo:      docker compose --profile demo up -d --build demo
 #   Logs:                docker compose logs -f
 #
 # Configure via .env (copy from .env.example). Flip mock/real with SENSOR_MODE,
@@ -44,6 +45,22 @@ services:
       - "/dev/serial/by-id/usb-Silicon_Labs_CP2105_Dual_USB_to_UART_Bridge_Controller_010BCEBF-if01-port0:/dev/ttyUSB1"
     group_add:
       - dialout
+
+  # Live dashboard demo (#297) — scripted occupancy bands, over-capacity pulses
+  # and Pi-health states for the demo rooms. No hardware, no device mappings;
+  # without a .env it defaults straight to the production backend, so on the Pi
+  # this one command is all it takes:
+  #   docker compose --profile demo up -d --build demo
+  # Rooms/capacities come from DEMO_ROOMS (must match the rooms in Postgres).
+  demo:
+    <<: *sensor-base
+    container_name: occupi-demo-sender
+    profiles: ["demo"]
+    environment:
+      SENSOR_MODE: demo
+      BACKEND_HOST: ${BACKEND_HOST:-occupi.mi.hdm-stuttgart.de}
+      BACKEND_PORT: ${BACKEND_PORT:-443}
+      BACKEND_TLS: ${BACKEND_TLS:-true}
 
   # Second sensor — opt-in. Start with:
   #   docker compose --profile second-sensor up -d --build

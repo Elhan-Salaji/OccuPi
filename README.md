@@ -250,6 +250,11 @@ Two things are **not** the mock toggle:
   `/api/occupancy/all` return nothing or error, the dashboard shows example rooms and a
   "mock data" banner. It never writes to the backend, and it's unrelated to `SENSOR_MODE`.
 
+For the **server demo** there is a third source: `deploy/seed-demo-data.py` rewrites
+the InfluxDB `occupancy` table with eight weeks of shaped history and one room per
+dashboard edge case (over-capacity, chart gaps, stale timestamp, night-only use, …),
+then restarts the backend. See [deploy/README.md](deploy/README.md#demo-data-seed) (#300).
+
 ## Running on the server (production)
 
 The production host (`occupi.mi.hdm-stuttgart.de`, a Debian VM) runs the same stack with
@@ -338,7 +343,10 @@ Only the values you'll actually touch. Internal service-to-service URLs
 | `SPRING_PROFILES_ACTIVE`       | `dev`                       | `dev` = open, no auth; `prod` = Keycloak JWT      |
 | `INFLUXDB_URL`                 | `http://localhost:8181`     | InfluxDB endpoint (compose sets `http://influxdb:8181`) |
 | `POSTGRES_URL`                 | `jdbc:postgresql://localhost:5432/occupi` | room-metadata DB                   |
-| `occupancy.latest-lookback-days` | `7`                       | how far back the "latest per room" query scans   |
+| `occupancy.latest-lookback-days` | `7`                       | TTL of the InfluxDB last value cache serving "latest per room" |
+| `occupancy.latest-fallback-days` | `2`                       | bounded-scan window that tops up the cache after an InfluxDB restart |
+| `chart.history.max-hours` / `forecast.max-hours` | `168`     | hard cap on the history/forecast request window  |
+| `chart.weekpattern.max-weeks`  | `8`                         | hard cap on the week-pattern request window       |
 
 **Sensor sender** (`raspberry/.env`, copy from `raspberry/.env.example`):
 

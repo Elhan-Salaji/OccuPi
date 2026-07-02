@@ -151,4 +151,11 @@ class ForecastServiceImplTest {
         assertThatIllegalArgumentException()
                 .isThrownBy(() -> service.forecast("room-1", 0));
     }
+
+    @Test
+    @DisplayName("throws on forecastHours beyond the cap (guards the parquet file limit, #294)")
+    void forecast_hoursBeyondCap_throws() {
+        assertThatIllegalArgumentException()
+                .isThrownBy(() -> service.forecast("room-1", 169));
+    }
 }

@@ -27,7 +27,7 @@ def _next_count(current: int, target: int, capacity: int, max_step: int) -> int:
     return max(0, min(capacity, current + step))
 
 
-def _estimate_confidence(count: int, capacity: int) -> float:
+def estimate_confidence(count: int, capacity: int) -> float:
     """
     Fake a plausible confidence: high for a near-empty room, a little lower as it
     fills up (more people are harder to separate), with light random jitter.
@@ -79,7 +79,7 @@ def mock_sensor_loop(enqueue_frame, room_ids) -> None:
                 "frameNum": frame_num,
                 "roomId": room_id,
                 "numDetectedTracks": s["count"],
-                "confidence": _estimate_confidence(s["count"], capacity),
+                "confidence": estimate_confidence(s["count"], capacity),
             })
             time.sleep(per_room_delay)
 
