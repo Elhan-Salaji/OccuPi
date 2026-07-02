@@ -56,6 +56,15 @@ export const RoomFilters: React.FC<RoomFiltersProps> =
                 setSelectedFloors([...selectedFloors, floor]);
             }
         };
+
+        const handleReset = () => {
+            setSelectedBuildings([]);
+            setSelectedFloors([]);
+            setSearch('');
+            setStatusFilter('');
+            setSortBy('');
+        }
+
         return (
             <div className="bg-white p-5 rounded-2xl border border-gray-100 mb-6 flex flex-col gap-6">
                 {/* building filters */}
@@ -160,9 +169,9 @@ export const RoomFilters: React.FC<RoomFiltersProps> =
                 {/* end of the flex row */}
 
                 {/* separation line*/}
-                <hr className="border-gray-100 mt-2"/>
+                <hr className="border-gray-100"/>
 
-                <div className="flex flex-wrap gap-3 mt-2 mb-4">
+                <div className="flex flex-wrap gap-3">
 
                     {/* Search input */}
                     <input type="text" placeholder="Suche..." value={search} onChange={(e) => setSearch(e.target.value)}
@@ -192,6 +201,15 @@ export const RoomFilters: React.FC<RoomFiltersProps> =
                         <option value="most">Auslastung: Höchste zuerst</option>
                         <option value="building">Gebäude: Alphabetisch</option>
                     </select>
+
+                    {/* reset button */}
+                    <button
+                        onClick={handleReset}
+                        className="ml-auto px-4 py-2 text-sm text-red-500 hover:bg-red-100 rounded-xl transition-colors font-medium border border-red-200"
+                    >
+                        Filter löschen
+                    </button>
+
                 </div>
             </div>
         );

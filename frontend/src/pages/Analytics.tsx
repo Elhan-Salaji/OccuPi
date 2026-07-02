@@ -109,7 +109,7 @@ export default function Analytics() {
                                 <StatusBadge occupancyRate={room.occupancyRate}/>
                             </td>
                             <td className="px-4 py-3">
-                                <PinButton roomId={room.roomId} />
+                                <PinButton roomId={room.roomId}/>
                             </td>
                         </tr>
                     ))}
