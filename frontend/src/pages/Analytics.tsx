@@ -54,7 +54,7 @@ export default function Analytics() {
     return (
         <div className="max-w-7xl mx-auto">
             <header className="mb-8">
-                <h1 className="text-3xl font-bold text-purple-600">Analytics</h1>
+                <h1 className="text-3xl font-bold text-purple-600">Räume</h1>
                 <p className="text-gray-500 mt-2">Campus-Überblick, Filter, Sortierung & Export</p>
             </header>
 

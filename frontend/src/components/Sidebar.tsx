@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, ChartColumn, DoorOpen, PanelLeftOpen, PanelLeftClose, LogOut, Shield } from 'lucide-react';
+import { LayoutDashboard, DoorOpen, PanelLeftOpen, PanelLeftClose, LogOut, Shield } from 'lucide-react';
 import { useAuthStore} from "../hooks/useAuthStore";
 
 export const Sidebar = ({ mobileOpen, onMobileClose }: { mobileOpen: boolean; onMobileClose: () => void }) => {
@@ -25,8 +25,7 @@ export const Sidebar = ({ mobileOpen, onMobileClose }: { mobileOpen: boolean; on
     // it's an array/list - easier and shorter
     const navItems = [
         { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-        { path: '/rooms', label: 'Räume', icon: DoorOpen },
-        { path: '/analytics', label: 'Analytics', icon: ChartColumn },
+        { path: '/analytics', label: 'Räume', icon: DoorOpen },
         //if admin
         ...(user?.role === 'admin' ? [{ path: '/admin', label: 'Admin', icon: Shield}] : [])
     ];
