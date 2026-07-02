@@ -70,7 +70,7 @@ export default function Analytics() {
                 availableBuildings={buildings}
                 selectedBuildings={selectedBuildings}
                 setSelectedBuildings={setSelectedBuildings}
-                availableFloors={['-1', '0', '1', '2']}
+                availableFloors={[...new Set(rooms.map(r => String(r.floor)))].sort((a, b) => Number(a) - Number(b))}
                 selectedFloors={selectedFloors}
                 setSelectedFloors={setSelectedFloors}
                 search={search}
