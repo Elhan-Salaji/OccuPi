@@ -19,6 +19,7 @@ headcount, a confidence value, and a timestamp:
 
 - `mock` (default) generates a smooth, bounded occupancy curve. No hardware needed.
 - `real` reads frames from the mmWave sensor over two serial ports.
+- `demo` runs the scripted dashboard demo (see "Dashboard demo mode" below). No hardware needed.
 
 ## Requirements
 
@@ -50,7 +51,7 @@ Every setting comes from the environment. Edit `.env` (copied from `.env.example
 
 | Variable | Default | Meaning |
 |---|---|---|
-| `SENSOR_MODE` | `mock` | `mock` or `real` |
+| `SENSOR_MODE` | `mock` | `mock`, `real` or `demo` |
 | `BACKEND_HOST` | `localhost` | Backend host |
 | `BACKEND_PORT` | `8080` | Backend port |
 | `BACKEND_WS_PATH` | `/ws` | WebSocket path |
@@ -61,6 +62,10 @@ Every setting comes from the environment. Edit `.env` (copied from `.env.example
 | `MOCK_ROOM_CAPACITY` | `30` | Upper bound for the mock headcount |
 | `MOCK_MAX_STEP` | `2` | Largest change between two mock readings |
 | `MOCK_ROOM_IDS` | (empty) | Comma-separated room IDs to simulate from one container; empty = just `ROOM_ID_01` |
+| `DEMO_ROOMS` | `016E:50,136:20,011:250` | Demo rooms as `roomId:capacity` pairs; capacities must match Postgres |
+| `DEMO_INTERVAL` | `15` | Seconds between demo readings per room (keep within 10–30) |
+| `DEMO_MAX_STEP` | `3` | Largest headcount change between two demo readings |
+| `DEMO_METRICS_INTERVAL` | `45` | Seconds between demo health snapshots per sensor (keep within 30–60) |
 
 For the real sensor, set `SENSOR_MODE=real`; the serial devices are already mapped on
 `sensor-01` (next section).
@@ -93,6 +98,54 @@ network or VPN needed.
 
 The Pi talks to the backend, never to the database directly. InfluxDB and Postgres have no
 public ports on purpose; the backend is the only door, and `/ws` is already open for it.
+
+## Dashboard demo mode
+
+`SENSOR_MODE=demo` turns the sender into a scripted live demo for the dashboard
+(#297): a handful of prominent rooms whose occupancy visibly changes while someone
+watches the frontend. Everything goes over the normal STOMP path, so the readings
+run through the full Receiver → InfluxDB → WebSocket-broadcast chain and the
+dashboard tiles update live, without a reload — that is the whole point over
+seeding the database directly.
+
+Per room the scenario:
+
+- walks the count in small steps (±1–3 people) through the traffic-light bands
+  (~30 % → ~65 % → ~90 % of capacity), resting a few minutes at each level, so
+  green/yellow/red transitions happen while you watch;
+- occasionally overshoots the capacity by a few people for a couple of minutes
+  (e.g. 22/20), which triggers the dashboard's over-capacity pulse (#244);
+- reports as its own sensor (`sensor-<roomId>`) and sends a synthetic Pi-health
+  snapshot every `DEMO_METRICS_INTERVAL`. The profiles cycle healthy → warning →
+  critical across the configured rooms, so the admin panel's metrics section
+  (#224) shows all three states, with slowly drifting values and a stressed
+  sensor that accumulates drops.
+
+On the Pi (or any machine with Docker) one command is enough — without a `.env`
+the demo service defaults straight to the production backend over TLS:
+
+```bash
+cd raspberry
+docker compose --profile demo up -d --build demo
+docker compose logs -f demo      # expect: Tick N: 016E=34/50, 136=18/20, 011=75/250
+```
+
+An existing `.env` wins over those defaults, so a `BACKEND_HOST=localhost` from
+local testing would redirect the demo — check the file before starting.
+
+Two things must line up with the server, or the demo misleads:
+
+- **The rooms must exist in Postgres** (create them in the admin panel),
+  otherwise the frontend never shows them.
+- **Each capacity in `DEMO_ROOMS` must match the room's capacity in Postgres.**
+  The frontend computes the traffic light from `count / capacity(Postgres)`; a
+  mismatch shifts every band the scenario aims for.
+
+Leave rooms that should stay static or empty (and the real sensor's room) out of
+`DEMO_ROOMS`. The default rates — one reading per room every 15 s, one health
+snapshot per sensor every 45 s — are deliberately moderate: InfluxDB 3 Core
+rejects queries that scan too many parquet files (#294), so don't crank the
+intervals down for long-running demos.
 
 ## Real sensor mode
 
@@ -152,7 +205,8 @@ SENSOR_MODE=mock BACKEND_HOST=localhost ./run.sh
 
 ## Notes
 
-- The sender connects over plain WebSocket (`ws`). Reaching the production backend through
-  the Nginx TLS endpoint (`wss`) needs extra setup and is tracked separately.
-- Pi health metrics (CPU, memory, queue depth) are logged locally but not yet sent to the
-  backend (#110).
+- Pi health metrics (CPU, memory, queue depth, throughput) are logged locally and sent to
+  the backend at `/app/metrics` (#110). In demo mode the scripted per-sensor health is
+  sent instead; the local log line stays on.
+- Tests live in `tests/` and cover the demo scenario logic. Run them with
+  `pip install -r requirements-dev.txt && python -m pytest` inside `raspberry/`.
