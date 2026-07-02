@@ -14,6 +14,7 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Stream;
 
@@ -226,10 +227,13 @@ public class MetricsRepository {
     /**
      * Maps a query result row to a MetricsData object.
      * Expected column order: see {@link #SELECT_COLUMNS}.
+     * String columns arrive as {@link String} from table scans but as Arrow
+     * {@code Text} from {@code last_cache()} reads, so they must be converted,
+     * not cast.
      */
     private MetricsData toMetricsData(Object[] row) {
         return MetricsData.builder()
-                .sensorId((String) row[0])
+                .sensorId(Objects.toString(row[0], null))
                 .cpuPercentage(((Number) row[1]).doubleValue())
                 .memoryPercentage(((Number) row[2]).doubleValue())
                 .queueSize(((Number) row[3]).intValue())

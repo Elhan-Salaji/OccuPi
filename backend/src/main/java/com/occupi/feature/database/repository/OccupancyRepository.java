@@ -14,6 +14,7 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Stream;
 
@@ -184,11 +185,14 @@ public class OccupancyRepository {
     /**
      * Maps a query result row to an OccupancyData object.
      * Expected column order: roomId, sensorId, count, confidence, time.
+     * String columns arrive as {@link String} from table scans but as Arrow
+     * {@code Text} from {@code last_cache()} reads, so they must be converted,
+     * not cast.
      */
     private OccupancyData toOccupancyData(Object[] row) {
         return OccupancyData.builder()
-                .roomId((String) row[0])
-                .sensorId((String) row[1])
+                .roomId(Objects.toString(row[0], null))
+                .sensorId(Objects.toString(row[1], null))
                 .count(((Number) row[2]).intValue())
                 .confidence(((Number) row[3]).doubleValue())
                 .timestamp(InfluxTime.toInstant(row[4]))
