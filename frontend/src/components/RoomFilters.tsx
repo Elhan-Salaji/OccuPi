@@ -177,19 +177,6 @@ export const RoomFilters: React.FC<RoomFiltersProps> =
                     <input type="text" placeholder="Suche..." value={search} onChange={(e) => setSearch(e.target.value)}
                            className="bg-white w-full md:w-72 px-4 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-100"/>
 
-                    {/* Status filter
-            <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-                className="bg-white px-4 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-100">
-
-                <option value="" disabled hidden>Auslastung</option> // Eher
-                <option value="low">Niedrig</option>
-                <option value="medium">Mittel</option>
-                <option value="high">Hoch</option>
-            </select>
-            TODO: delete if not needed anymore*/}
-
                     {/* Sort */}
                     <select
                         value={sortBy}
