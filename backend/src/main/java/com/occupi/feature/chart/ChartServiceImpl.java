@@ -53,6 +53,21 @@ public class ChartServiceImpl implements ChartService {
     @Value("${chart.history.max-points:500}")
     private int maxPoints;
 
+    /**
+     * Hard cap on the history look-back window. Bounds how many parquet files a
+     * single request can make InfluxDB open — the query file limit rejects wider
+     * scans outright (#294).
+     */
+    @Value("${chart.history.max-hours:168}")
+    private int maxHours = 168;
+
+    /**
+     * Hard cap on the week-pattern look-back, for the same reason as
+     * {@link #maxHours}. Eight weeks is also all the frontend ever requests.
+     */
+    @Value("${chart.weekpattern.max-weeks:8}")
+    private int maxWeeks = 8;
+
     /** Earliest hour (inclusive) considered when picking the quiet time. */
     @Value("${chart.weekpattern.quiet-start-hour:8}")
     private int quietStartHour;
@@ -76,6 +91,10 @@ public class ChartServiceImpl implements ChartService {
         validateRoomId(roomId);
         if (hours <= 0) {
             throw new IllegalArgumentException("hours must be positive, got: " + hours);
+        }
+        if (hours > maxHours) {
+            throw new IllegalArgumentException(
+                    "hours must be at most " + maxHours + ", got: " + hours);
         }
 
         int slotMinutes = TimeSlots.slotMinutes(hours, maxPoints);
@@ -109,6 +128,10 @@ public class ChartServiceImpl implements ChartService {
         validateRoomId(roomId);
         if (weeks <= 0) {
             throw new IllegalArgumentException("weeks must be positive, got: " + weeks);
+        }
+        if (weeks > maxWeeks) {
+            throw new IllegalArgumentException(
+                    "weeks must be at most " + maxWeeks + ", got: " + weeks);
         }
 
         Instant end = clock.instant();

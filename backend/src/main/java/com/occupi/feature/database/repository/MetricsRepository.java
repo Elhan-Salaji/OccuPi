@@ -13,7 +13,10 @@ import org.springframework.stereotype.Repository;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Stream;
 
@@ -22,7 +25,13 @@ import java.util.stream.Stream;
 @RequiredArgsConstructor
 public class MetricsRepository {
 
-    static final String MEASUREMENT_NAME = "metrics";
+    public static final String MEASUREMENT_NAME = "metrics";
+
+    /** Name of the InfluxDB last value cache serving the latest-per-sensor reads (#294). */
+    public static final String LAST_CACHE_NAME = "metrics_latest_by_sensor";
+
+    /** Tag column the last value cache is keyed by: one cached row per sensor. */
+    public static final String LAST_CACHE_KEY_COLUMN = "sensorId";
 
     /** Column list shared by every read query; order must match {@link #toMetricsData}. */
     private static final String SELECT_COLUMNS =
@@ -32,13 +41,23 @@ public class MetricsRepository {
     private final InfluxDBClient influxDBClient;
 
     /**
-     * How many days back {@link #findAllLatest()} scans for the newest row per sensor.
-     * The scan MUST be bounded: without a time predicate InfluxDB reads the whole
-     * measurement history and sorts it on every call, which pegged the single-core
-     * server CPU once a large amount of data had accumulated (#273).
+     * How many days back the SQL fallback scans when the last value cache has no
+     * rows — right after an InfluxDB restart, before the sensors have reported
+     * again (InfluxDB 3 Core persists the cache definition, not its contents, #294).
+     * The scan MUST be bounded and stay short: a wider window both pegged the
+     * single-core server CPU (#273) and now exceeds InfluxDB's parquet file limit
+     * at roughly four days' worth of gen1 files.
      */
-    @Value("${metrics.latest-lookback-days:7}")
-    private int latestLookbackDays = 7;
+    @Value("${metrics.latest-fallback-days:2}")
+    private int latestFallbackDays = 2;
+
+    /**
+     * Oldest allowed start of a {@link #findBySensorSince} window; an unlimited
+     * {@code since} would let a single request exceed InfluxDB's parquet file
+     * limit (#294). Older values are clamped, not rejected.
+     */
+    @Value("${metrics.history-max-days:7}")
+    private int historyMaxDays = 7;
 
     public void save(MetricsData metrics) {
         validate(metrics);
@@ -78,7 +97,9 @@ public class MetricsRepository {
     }
 
     /**
-     * Returns the most recent metrics row for a single sensor.
+     * Returns the most recent metrics row for a single sensor, served from the last
+     * value cache; falls back to a bounded scan while the cache is cold after an
+     * InfluxDB restart (#294).
      *
      * @param sensorId the sensor to look up (alphanumeric and dashes only)
      * @return the latest metrics, or empty if the sensor has no data
@@ -87,13 +108,19 @@ public class MetricsRepository {
     public Optional<MetricsData> findLatestBySensor(String sensorId) {
         validateSensorId(sensorId);
 
+        List<MetricsData> cached = queryLastCache(" WHERE \"sensorId\" = '%s'".formatted(sensorId));
+        if (!cached.isEmpty()) {
+            return Optional.of(cached.get(0));
+        }
+
         String sql = """
                 SELECT %s
                 FROM "%s"
                 WHERE "sensorId" = '%s'
+                  AND time >= '%s'
                 ORDER BY time DESC
                 LIMIT 1
-                """.formatted(SELECT_COLUMNS, MEASUREMENT_NAME, sensorId);
+                """.formatted(SELECT_COLUMNS, MEASUREMENT_NAME, sensorId, fallbackSince());
 
         try (Stream<Object[]> rows = influxDBClient.query(sql, QueryOptions.defaultQueryOptions())) {
             return rows.map(this::toMetricsData).findFirst();
@@ -101,16 +128,18 @@ public class MetricsRepository {
     }
 
     /**
-     * Returns the most recent metrics row for every known sensor.
-     * Uses a window function to pick the latest row per sensorId in a single query,
-     * scanning only the last {@link #latestLookbackDays} days so the query stays
-     * cheap regardless of how much history has accumulated (see #273).
+     * Returns the most recent metrics row for every known sensor: the union of
+     * the last value cache — an in-memory lookup that opens no parquet file and
+     * reaches back its full TTL (#294) — and a window-function scan over the last
+     * {@link #latestFallbackDays} days, taking the newer row per sensor. The
+     * union matters because InfluxDB persists the cache definition but not its
+     * contents: after an InfluxDB restart the cache only knows sensors that have
+     * written since, and the bounded scan restores the rest.
      *
-     * @return one latest row per sensor within the lookback window
-     *         (empty list if no sensor has reported in that window)
+     * @return one latest row per sensor (empty list if no sensor has reported
+     *         within the cache TTL or the fallback window)
      */
     public List<MetricsData> findAllLatest() {
-        Instant since = Instant.now().minus(latestLookbackDays, ChronoUnit.DAYS);
         String sql = """
                 SELECT %s
                 FROM (
@@ -120,21 +149,72 @@ public class MetricsRepository {
                     WHERE time >= '%s'
                 )
                 WHERE rn = 1
-                """.formatted(SELECT_COLUMNS, SELECT_COLUMNS, MEASUREMENT_NAME, since);
+                """.formatted(SELECT_COLUMNS, SELECT_COLUMNS, MEASUREMENT_NAME, fallbackSince());
+
+        Map<String, MetricsData> latest = new LinkedHashMap<>();
+        try (Stream<Object[]> rows = influxDBClient.query(sql, QueryOptions.defaultQueryOptions())) {
+            rows.forEach(row -> {
+                MetricsData data = toMetricsData(row);
+                latest.put(data.getSensorId(), data);
+            });
+        }
+        for (MetricsData data : queryLastCache("")) {
+            latest.merge(data.getSensorId(), data, MetricsRepository::newer);
+        }
+        return List.copyOf(latest.values());
+    }
+
+    private static MetricsData newer(MetricsData a, MetricsData b) {
+        if (a.getTimestamp() == null) {
+            return b;
+        }
+        if (b.getTimestamp() == null) {
+            return a;
+        }
+        return b.getTimestamp().isAfter(a.getTimestamp()) ? b : a;
+    }
+
+    /**
+     * Reads from the last value cache. Returns an empty list when the cache has no
+     * matching rows or cannot be read (missing cache, InfluxDB error, stream broken
+     * mid-read) so that callers degrade to the bounded scan alone. A partial read
+     * is discarded rather than returned — it must never pass for a complete cache
+     * view. Failures are logged at debug: the bounded scan covers the reads while
+     * {@link com.occupi.feature.database.config.InfluxLastCacheInitializer} keeps
+     * retrying the cache creation.
+     *
+     * @param whereClause optional {@code WHERE} clause (values must be validated
+     *                    by the caller), or an empty string for all rows
+     */
+    private List<MetricsData> queryLastCache(String whereClause) {
+        String sql = """
+                SELECT %s
+                FROM last_cache('%s', '%s')%s
+                """.formatted(SELECT_COLUMNS, MEASUREMENT_NAME, LAST_CACHE_NAME, whereClause);
 
         List<MetricsData> result = new ArrayList<>();
         try (Stream<Object[]> rows = influxDBClient.query(sql, QueryOptions.defaultQueryOptions())) {
             rows.forEach(row -> result.add(toMetricsData(row)));
+        } catch (RuntimeException e) {
+            log.debug("Last value cache '{}' not readable, relying on the bounded scan: {}",
+                    LAST_CACHE_NAME, e.getMessage());
+            return List.of();
         }
         return result;
     }
 
+    private Instant fallbackSince() {
+        return Instant.now().minus(latestFallbackDays, ChronoUnit.DAYS);
+    }
+
     /**
      * Returns all metrics rows for a sensor from {@code since} (inclusive) onward,
-     * ordered oldest first — for charts and history views.
+     * ordered oldest first — for charts and history views. {@code since} reaches at
+     * most {@link #historyMaxDays} days back; older values are clamped so a single
+     * request can never exceed InfluxDB's parquet file limit (#294).
      *
      * @param sensorId the sensor to look up (alphanumeric and dashes only)
-     * @param since    the start of the time window (inclusive)
+     * @param since    the start of the time window (inclusive, clamped)
      * @return the matching rows in ascending time order (empty list if none)
      * @throws IllegalArgumentException if sensorId is malformed or since is null
      */
@@ -142,6 +222,11 @@ public class MetricsRepository {
         validateSensorId(sensorId);
         if (since == null) {
             throw new IllegalArgumentException("since must not be null");
+        }
+
+        Instant oldestAllowed = Instant.now().minus(historyMaxDays, ChronoUnit.DAYS);
+        if (since.isBefore(oldestAllowed)) {
+            since = oldestAllowed;
         }
 
         String sql = """
@@ -162,10 +247,13 @@ public class MetricsRepository {
     /**
      * Maps a query result row to a MetricsData object.
      * Expected column order: see {@link #SELECT_COLUMNS}.
+     * String columns arrive as {@link String} from table scans but as Arrow
+     * {@code Text} from {@code last_cache()} reads, so they must be converted,
+     * not cast.
      */
     private MetricsData toMetricsData(Object[] row) {
         return MetricsData.builder()
-                .sensorId((String) row[0])
+                .sensorId(Objects.toString(row[0], null))
                 .cpuPercentage(((Number) row[1]).doubleValue())
                 .memoryPercentage(((Number) row[2]).doubleValue())
                 .queueSize(((Number) row[3]).intValue())

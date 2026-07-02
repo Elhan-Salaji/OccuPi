@@ -55,6 +55,14 @@ public class ForecastServiceImpl implements ForecastService {
     private double decay;
 
     /**
+     * Hard cap on the forecast horizon. Every lookback week runs its own query over
+     * a window this wide, so the cap bounds how many parquet files one request can
+     * make InfluxDB open — the query file limit rejects wider scans outright (#294).
+     */
+    @Value("${forecast.max-hours:168}")
+    private int maxForecastHours = 168;
+
+    /**
      * Point cap feeding the shared slot-width mapping. Deliberately reads the SAME key as
      * history ({@code chart.history.max-points}) so that, for equal windows, forecast and
      * history derive an identical slot width and grid — the contract the frontend #279
@@ -82,6 +90,10 @@ public class ForecastServiceImpl implements ForecastService {
         }
         if (forecastHours <= 0) {
             throw new IllegalArgumentException("forecastHours must be positive, got: " + forecastHours);
+        }
+        if (forecastHours > maxForecastHours) {
+            throw new IllegalArgumentException(
+                    "forecastHours must be at most " + maxForecastHours + ", got: " + forecastHours);
         }
 
         int slotMinutes = TimeSlots.slotMinutes(forecastHours, maxPoints);
