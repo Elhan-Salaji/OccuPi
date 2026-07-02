@@ -7,6 +7,7 @@ SENSOR_ID = os.getenv("SENSOR_ID", "sensor-01")
 # --- Sensor Mode ---
 # "mock" generates realistic fake occupancy data (no hardware needed), used by the
 # container and for local testing. "real" reads from the mmWave sensor over serial.
+# "demo" runs the scripted dashboard demo (see demo_data.py).
 # Flip this in one place: the SENSOR_MODE entry of your .env file.
 SENSOR_MODE = os.getenv("SENSOR_MODE", "mock").strip().lower()
 
@@ -17,6 +18,15 @@ MOCK_MAX_STEP      = int(os.getenv("MOCK_MAX_STEP",        "2"))    # max headco
 # Comma-separated room IDs to simulate from this single container (e.g. "006,011,137").
 # Empty = just ROOM_ID. Lets one mock container fill many rooms at once (no hardware).
 MOCK_ROOM_IDS      = [r.strip() for r in os.getenv("MOCK_ROOM_IDS", "").split(",") if r.strip()]
+
+# --- Demo Scenario (only used when SENSOR_MODE=demo) ---
+# Rooms the demo drives, as comma-separated roomId:capacity pairs. The capacity
+# must match the room's capacity in Postgres — the frontend computes the traffic
+# light from count / capacity(Postgres), so a mismatch shifts every band.
+DEMO_ROOMS            = os.getenv("DEMO_ROOMS", "016E:50,136:20,011:250")
+DEMO_INTERVAL         = float(os.getenv("DEMO_INTERVAL", "15"))  # seconds between readings per room (keep within 10-30)
+DEMO_MAX_STEP         = int(os.getenv("DEMO_MAX_STEP", "3"))     # max headcount change per reading (small steps)
+DEMO_METRICS_INTERVAL = float(os.getenv("DEMO_METRICS_INTERVAL", "45"))  # seconds between health snapshots (keep within 30-60)
 
 # --- Serial ---
 SERIAL_CFG_PORT  = os.getenv("SERIAL_CFG_PORT",  "/dev/ttyUSB0")
