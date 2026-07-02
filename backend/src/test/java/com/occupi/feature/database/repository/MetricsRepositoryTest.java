@@ -4,6 +4,7 @@ import com.influxdb.v3.client.InfluxDBClient;
 import com.influxdb.v3.client.Point;
 import com.influxdb.v3.client.query.QueryOptions;
 import com.occupi.feature.database.model.MetricsData;
+import org.apache.arrow.vector.util.Text;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -272,6 +273,20 @@ class MetricsRepositoryTest {
             assertTrue(sqlCaptor.getAllValues().get(1).contains("time >="),
                     "the fallback scan must constrain the window with a time predicate, "
                             + "otherwise it reads the entire measurement history");
+        }
+
+        @Test
+        @DisplayName("should map Arrow Text string columns as last_cache() rows deliver them")
+        void shouldMapArrowTextColumns() {
+            Instant ts = Instant.parse("2026-06-14T10:00:00Z");
+            when(influxDBClient.query(anyString(), any(QueryOptions.class)))
+                    .thenAnswer(inv -> Stream.<Object[]>of(new Object[]{
+                            new Text("sensor-A"), 42.0, 60.0, 3L, 100L, 1L, 12.5, nanos(ts)}));
+
+            List<MetricsData> result = repository.findAllLatest();
+
+            assertEquals(1, result.size());
+            assertEquals("sensor-A", result.get(0).getSensorId());
         }
 
         @Test
