@@ -23,6 +23,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -154,7 +155,7 @@ class MetricsRepositoryTest {
     class FindLatestBySensor {
 
         @Test
-        @DisplayName("should map the latest row to MetricsData")
+        @DisplayName("should serve the latest row from the last value cache")
         void shouldMapLatestRow() {
             Instant ts = Instant.parse("2026-06-14T10:00:00Z");
             when(influxDBClient.query(anyString(), any(QueryOptions.class)))
@@ -173,10 +174,33 @@ class MetricsRepositoryTest {
             assertEquals(1, data.getDropped());
             assertEquals(12.5f, data.getAvgProcessTime());
             assertEquals(ts, data.getTimestamp());
+
+            ArgumentCaptor<String> sqlCaptor = ArgumentCaptor.forClass(String.class);
+            verify(influxDBClient).query(sqlCaptor.capture(), any(QueryOptions.class));
+            assertTrue(sqlCaptor.getValue().contains("last_cache('metrics'"),
+                    "the first read must hit the last value cache, not a scan");
         }
 
         @Test
-        @DisplayName("should return empty when no rows are found")
+        @DisplayName("should fall back to a time-bounded scan when the cache is empty")
+        void shouldFallBackWhenCacheEmpty() {
+            Instant ts = Instant.parse("2026-06-14T10:00:00Z");
+            when(influxDBClient.query(anyString(), any(QueryOptions.class)))
+                    .thenAnswer(inv -> Stream.empty())
+                    .thenAnswer(inv -> Stream.<Object[]>of(
+                            row("sensor-A", 42.0, 60.0, 3L, 100L, 1L, 12.5, ts)));
+
+            Optional<MetricsData> result = repository.findLatestBySensor("sensor-A");
+
+            assertTrue(result.isPresent());
+            ArgumentCaptor<String> sqlCaptor = ArgumentCaptor.forClass(String.class);
+            verify(influxDBClient, times(2)).query(sqlCaptor.capture(), any(QueryOptions.class));
+            assertTrue(sqlCaptor.getAllValues().get(1).contains("time >="),
+                    "the fallback scan must be bounded by a time predicate");
+        }
+
+        @Test
+        @DisplayName("should return empty when neither cache nor fallback have rows")
         void shouldReturnEmptyWhenNoRows() {
             when(influxDBClient.query(anyString(), any(QueryOptions.class)))
                     .thenAnswer(inv -> Stream.empty());
@@ -204,7 +228,7 @@ class MetricsRepositoryTest {
     class FindAllLatest {
 
         @Test
-        @DisplayName("should map every returned row to MetricsData")
+        @DisplayName("should serve all rows from the last value cache without scanning")
         void shouldMapAllRows() {
             Instant ts = Instant.parse("2026-06-14T10:00:00Z");
             when(influxDBClient.query(anyString(), any(QueryOptions.class)))
@@ -219,6 +243,11 @@ class MetricsRepositoryTest {
             assertEquals(3, result.get(0).getQueueSize());
             assertEquals("sensor-B", result.get(1).getSensorId());
             assertEquals(50, result.get(1).getSent());
+
+            ArgumentCaptor<String> sqlCaptor = ArgumentCaptor.forClass(String.class);
+            verify(influxDBClient).query(sqlCaptor.capture(), any(QueryOptions.class));
+            assertTrue(sqlCaptor.getValue().contains("last_cache('metrics'"),
+                    "a warm cache must satisfy the read without a second query");
         }
 
         @Test
@@ -231,7 +260,7 @@ class MetricsRepositoryTest {
         }
 
         @Test
-        @DisplayName("should bound the scan with a time predicate (guards #273)")
+        @DisplayName("should fall back to a time-bounded scan when the cache is empty (guards #273)")
         void shouldBoundScanByTime() {
             when(influxDBClient.query(anyString(), any(QueryOptions.class)))
                     .thenAnswer(inv -> Stream.empty());
@@ -239,10 +268,25 @@ class MetricsRepositoryTest {
             repository.findAllLatest();
 
             ArgumentCaptor<String> sqlCaptor = ArgumentCaptor.forClass(String.class);
-            verify(influxDBClient).query(sqlCaptor.capture(), any(QueryOptions.class));
-            assertTrue(sqlCaptor.getValue().contains("time >="),
-                    "findAllLatest must constrain the scan with a time predicate, "
+            verify(influxDBClient, times(2)).query(sqlCaptor.capture(), any(QueryOptions.class));
+            assertTrue(sqlCaptor.getAllValues().get(1).contains("time >="),
+                    "the fallback scan must constrain the window with a time predicate, "
                             + "otherwise it reads the entire measurement history");
+        }
+
+        @Test
+        @DisplayName("should fall back to the bounded scan when the cache is not readable")
+        void shouldFallBackWhenCacheReadFails() {
+            Instant ts = Instant.parse("2026-06-14T10:00:00Z");
+            when(influxDBClient.query(anyString(), any(QueryOptions.class)))
+                    .thenThrow(new RuntimeException("could not find cache"))
+                    .thenAnswer(inv -> Stream.<Object[]>of(
+                            row("sensor-A", 42.0, 60.0, 3L, 100L, 1L, 12.5, ts)));
+
+            List<MetricsData> result = repository.findAllLatest();
+
+            assertEquals(1, result.size());
+            assertEquals("sensor-A", result.get(0).getSensorId());
         }
     }
 
@@ -291,6 +335,20 @@ class MetricsRepositoryTest {
         void shouldRejectNullSince() {
             assertThrows(IllegalArgumentException.class,
                     () -> repository.findBySensorSince("sensor-A", null));
+        }
+
+        @Test
+        @DisplayName("should clamp a since older than the history window (guards #294)")
+        void shouldClampAncientSince() {
+            when(influxDBClient.query(anyString(), any(QueryOptions.class)))
+                    .thenAnswer(inv -> Stream.empty());
+
+            repository.findBySensorSince("sensor-A", Instant.parse("1970-01-01T00:00:00Z"));
+
+            ArgumentCaptor<String> sqlCaptor = ArgumentCaptor.forClass(String.class);
+            verify(influxDBClient).query(sqlCaptor.capture(), any(QueryOptions.class));
+            assertFalse(sqlCaptor.getValue().contains("1970-01-01"),
+                    "an epoch since must be clamped, otherwise one request scans the whole history");
         }
     }
 }

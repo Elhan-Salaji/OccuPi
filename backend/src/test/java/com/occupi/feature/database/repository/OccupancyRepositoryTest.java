@@ -181,7 +181,7 @@ class OccupancyRepositoryTest {
     class FindLatestByRoom {
 
         @Test
-        @DisplayName("should map the latest row to OccupancyData")
+        @DisplayName("should serve the latest row from the last value cache")
         void shouldMapLatestRow() {
             Instant ts = Instant.parse("2026-06-14T10:00:00Z");
             // InfluxDB 3 returns the time column as nanoseconds (BigInteger), not Instant.
@@ -198,10 +198,33 @@ class OccupancyRepositoryTest {
             assertEquals(12, data.getCount());
             assertEquals(0.9, data.getConfidence());
             assertEquals(ts, data.getTimestamp());
+
+            ArgumentCaptor<String> sqlCaptor = ArgumentCaptor.forClass(String.class);
+            verify(influxDBClient).query(sqlCaptor.capture(), any(QueryOptions.class));
+            assertTrue(sqlCaptor.getValue().contains("last_cache('occupancy'"),
+                    "the first read must hit the last value cache, not a scan");
         }
 
         @Test
-        @DisplayName("should return empty when no rows are found")
+        @DisplayName("should fall back to a time-bounded scan when the cache is empty")
+        void shouldFallBackWhenCacheEmpty() {
+            Instant ts = Instant.parse("2026-06-14T10:00:00Z");
+            when(influxDBClient.query(anyString(), any(QueryOptions.class)))
+                    .thenAnswer(inv -> Stream.empty())
+                    .thenAnswer(inv -> Stream.<Object[]>of(
+                            new Object[]{"room-101", "sensor-A", 12L, 0.9, nanos(ts)}));
+
+            Optional<OccupancyData> result = repository.findLatestByRoom("room-101");
+
+            assertTrue(result.isPresent());
+            ArgumentCaptor<String> sqlCaptor = ArgumentCaptor.forClass(String.class);
+            verify(influxDBClient, times(2)).query(sqlCaptor.capture(), any(QueryOptions.class));
+            assertTrue(sqlCaptor.getAllValues().get(1).contains("time >="),
+                    "the fallback scan must be bounded by a time predicate");
+        }
+
+        @Test
+        @DisplayName("should return empty when neither cache nor fallback have rows")
         void shouldReturnEmptyWhenNoRows() {
             when(influxDBClient.query(anyString(), any(QueryOptions.class)))
                     .thenAnswer(inv -> Stream.empty());
@@ -228,7 +251,7 @@ class OccupancyRepositoryTest {
     class FindAllLatest {
 
         @Test
-        @DisplayName("should map every returned row to OccupancyData")
+        @DisplayName("should serve all rows from the last value cache without scanning")
         void shouldMapAllRows() {
             Instant ts = Instant.parse("2026-06-14T10:00:00Z");
             when(influxDBClient.query(anyString(), any(QueryOptions.class)))
@@ -243,6 +266,11 @@ class OccupancyRepositoryTest {
             assertEquals(5, result.get(0).getCount());
             assertEquals("room-202", result.get(1).getRoomId());
             assertEquals(20, result.get(1).getCount());
+
+            ArgumentCaptor<String> sqlCaptor = ArgumentCaptor.forClass(String.class);
+            verify(influxDBClient).query(sqlCaptor.capture(), any(QueryOptions.class));
+            assertTrue(sqlCaptor.getValue().contains("last_cache('occupancy'"),
+                    "a warm cache must satisfy the read without a second query");
         }
 
         @Test
@@ -255,7 +283,7 @@ class OccupancyRepositoryTest {
         }
 
         @Test
-        @DisplayName("should bound the scan with a time predicate (guards #273)")
+        @DisplayName("should fall back to a time-bounded scan when the cache is empty (guards #273)")
         void shouldBoundScanByTime() {
             when(influxDBClient.query(anyString(), any(QueryOptions.class)))
                     .thenAnswer(inv -> Stream.empty());
@@ -263,10 +291,25 @@ class OccupancyRepositoryTest {
             repository.findAllLatest();
 
             ArgumentCaptor<String> sqlCaptor = ArgumentCaptor.forClass(String.class);
-            verify(influxDBClient).query(sqlCaptor.capture(), any(QueryOptions.class));
-            assertTrue(sqlCaptor.getValue().contains("time >="),
-                    "findAllLatest must constrain the scan with a time predicate, "
+            verify(influxDBClient, times(2)).query(sqlCaptor.capture(), any(QueryOptions.class));
+            assertTrue(sqlCaptor.getAllValues().get(1).contains("time >="),
+                    "the fallback scan must constrain the window with a time predicate, "
                             + "otherwise it reads the entire measurement history");
+        }
+
+        @Test
+        @DisplayName("should fall back to the bounded scan when the cache is not readable")
+        void shouldFallBackWhenCacheReadFails() {
+            Instant ts = Instant.parse("2026-06-14T10:00:00Z");
+            when(influxDBClient.query(anyString(), any(QueryOptions.class)))
+                    .thenThrow(new RuntimeException("could not find cache"))
+                    .thenAnswer(inv -> Stream.<Object[]>of(
+                            new Object[]{"room-101", "sensor-A", 5L, 0.8, nanos(ts)}));
+
+            List<OccupancyData> result = repository.findAllLatest();
+
+            assertEquals(1, result.size());
+            assertEquals("room-101", result.get(0).getRoomId());
         }
     }
 }

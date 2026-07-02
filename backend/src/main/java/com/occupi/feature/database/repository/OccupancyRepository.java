@@ -37,14 +37,15 @@ public class OccupancyRepository {
     private final InfluxDBClient influxDBClient;
 
     /**
-     * How many days back {@link #findAllLatest()} scans for the newest row per room.
-     * The scan MUST be bounded: without a time predicate InfluxDB reads the whole
-     * measurement history and sorts it on every call, which pegged the single-core
-     * server CPU once a large amount of data had accumulated (#273). A room that has
-     * been silent longer than this window simply won't appear until it reports again.
+     * How many days back the SQL fallback scans when the last value cache has no
+     * rows — right after an InfluxDB restart, before the sensors have reported
+     * again (InfluxDB 3 Core persists the cache definition, not its contents, #294).
+     * The scan MUST be bounded and stay short: a wider window both pegged the
+     * single-core server CPU (#273) and now exceeds InfluxDB's parquet file limit
+     * at roughly four days' worth of gen1 files.
      */
-    @Value("${occupancy.latest-lookback-days:7}")
-    private int latestLookbackDays = 7;
+    @Value("${occupancy.latest-fallback-days:2}")
+    private int latestFallbackDays = 2;
 
     /**
      * Saves a single occupancy measurement to InfluxDB.
@@ -88,7 +89,9 @@ public class OccupancyRepository {
     }
 
     /**
-     * Returns the most recent occupancy measurement for a single room.
+     * Returns the most recent occupancy measurement for a single room, served from
+     * the last value cache; falls back to a bounded scan while the cache is cold
+     * after an InfluxDB restart (#294).
      *
      * @param roomId the room to look up (alphanumeric and dashes only)
      * @return the latest measurement, or empty if the room has no data
@@ -97,13 +100,19 @@ public class OccupancyRepository {
     public Optional<OccupancyData> findLatestByRoom(String roomId) {
         validateRoomId(roomId);
 
+        List<OccupancyData> cached = queryLastCache(" WHERE \"roomId\" = '%s'".formatted(roomId));
+        if (!cached.isEmpty()) {
+            return Optional.of(cached.get(0));
+        }
+
         String sql = """
                 SELECT "roomId", "sensorId", "count", "confidence", time
                 FROM "%s"
                 WHERE "roomId" = '%s'
+                  AND time >= '%s'
                 ORDER BY time DESC
                 LIMIT 1
-                """.formatted(MEASUREMENT_NAME, roomId);
+                """.formatted(MEASUREMENT_NAME, roomId, fallbackSince());
 
         try (Stream<Object[]> rows = influxDBClient.query(sql, QueryOptions.defaultQueryOptions())) {
             return rows.map(this::toOccupancyData).findFirst();
@@ -111,16 +120,21 @@ public class OccupancyRepository {
     }
 
     /**
-     * Returns the most recent occupancy measurement for every known room.
-     * Uses a window function to pick the latest row per roomId in a single query,
-     * scanning only the last {@link #latestLookbackDays} days so the query stays
-     * cheap regardless of how much history has accumulated (see #273).
+     * Returns the most recent occupancy measurement for every known room, served
+     * from the last value cache — an in-memory lookup that opens no parquet file,
+     * so it stays cheap no matter how much history has accumulated (#294). While
+     * the cache is cold after an InfluxDB restart, a window-function scan over the
+     * last {@link #latestFallbackDays} days fills the gap.
      *
-     * @return one latest measurement per room within the lookback window
-     *         (empty list if no room has reported in that window)
+     * @return one latest measurement per room (empty list if no room has reported
+     *         within the cache TTL, or within the fallback window on a cold cache)
      */
     public List<OccupancyData> findAllLatest() {
-        Instant since = Instant.now().minus(latestLookbackDays, ChronoUnit.DAYS);
+        List<OccupancyData> cached = queryLastCache("");
+        if (!cached.isEmpty()) {
+            return cached;
+        }
+
         String sql = """
                 SELECT "roomId", "sensorId", "count", "confidence", time
                 FROM (
@@ -130,13 +144,41 @@ public class OccupancyRepository {
                     WHERE time >= '%s'
                 )
                 WHERE rn = 1
-                """.formatted(MEASUREMENT_NAME, since);
+                """.formatted(MEASUREMENT_NAME, fallbackSince());
 
         List<OccupancyData> result = new ArrayList<>();
         try (Stream<Object[]> rows = influxDBClient.query(sql, QueryOptions.defaultQueryOptions())) {
             rows.forEach(row -> result.add(toOccupancyData(row)));
         }
         return result;
+    }
+
+    /**
+     * Reads from the last value cache. Returns an empty list when the cache has no
+     * matching rows or cannot be read (missing cache, InfluxDB error) so that
+     * callers can fall back to a bounded scan.
+     *
+     * @param whereClause optional {@code WHERE} clause (values must be validated
+     *                    by the caller), or an empty string for all rows
+     */
+    private List<OccupancyData> queryLastCache(String whereClause) {
+        String sql = """
+                SELECT "roomId", "sensorId", "count", "confidence", time
+                FROM last_cache('%s', '%s')%s
+                """.formatted(MEASUREMENT_NAME, LAST_CACHE_NAME, whereClause);
+
+        List<OccupancyData> result = new ArrayList<>();
+        try (Stream<Object[]> rows = influxDBClient.query(sql, QueryOptions.defaultQueryOptions())) {
+            rows.forEach(row -> result.add(toOccupancyData(row)));
+        } catch (RuntimeException e) {
+            log.warn("Last value cache '{}' not readable, falling back to bounded scan: {}",
+                    LAST_CACHE_NAME, e.getMessage());
+        }
+        return result;
+    }
+
+    private Instant fallbackSince() {
+        return Instant.now().minus(latestFallbackDays, ChronoUnit.DAYS);
     }
 
     /**
