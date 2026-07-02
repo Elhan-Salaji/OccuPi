@@ -46,7 +46,7 @@ class ForecastInfluxIntegrationTest {
 
     @Container
     static final GenericContainer<?> influxdb =
-            new GenericContainer<>(DockerImageName.parse("influxdb:3-core"))
+            new GenericContainer<>(DockerImageName.parse("influxdb:3.9.3-core"))
                     .withExposedPorts(8181)
                     .withCommand("serve",
                             "--host-id", "occupi-test",

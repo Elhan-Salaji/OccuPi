@@ -45,7 +45,10 @@ services:
     restart: unless-stopped
 
   influxdb:
-    image: influxdb:3-core
+    # Pinned: the floating 3-core tag drifted from 3.9.x to 3.10.x and CI suddenly
+    # tested a different version than prod runs. The integration tests pin the same
+    # tag — bump both together, deliberately (#294).
+    image: influxdb:3.9.3-core
     container_name: occupi-influxdb3
     environment:
       - INFLUXDB3_HOST_ID=occupi-prod
