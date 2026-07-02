@@ -26,7 +26,13 @@ import java.util.stream.Stream;
 @RequiredArgsConstructor
 public class OccupancyRepository {
 
-    static final String MEASUREMENT_NAME = "occupancy";
+    public static final String MEASUREMENT_NAME = "occupancy";
+
+    /** Name of the InfluxDB last value cache serving the latest-per-room reads (#294). */
+    public static final String LAST_CACHE_NAME = "occupancy_latest_by_room";
+
+    /** Tag column the last value cache is keyed by: one cached row per room. */
+    public static final String LAST_CACHE_KEY_COLUMN = "roomId";
 
     private final InfluxDBClient influxDBClient;
 
