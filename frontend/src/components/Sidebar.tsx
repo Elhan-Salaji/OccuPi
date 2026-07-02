@@ -110,36 +110,39 @@ export const Sidebar = ({ mobileOpen, onMobileClose }: { mobileOpen: boolean; on
                     <LogOut size={22} className="shrink-0" />
                     {!isCollapsed && <span className="ml-4 truncate">Log out</span>}
                 </button>
-                {showLogoutDialog && (
-                    <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center">
-                        {/* White Box */}
-                        <div className="bg-white rounded-xl shadow-2xl p-6 max-w-sm w-full mx-4">
-                            <h2 className="text-xl font-bold text-gray-900 mb-2">Log out</h2>
-                            <p className="text-gray-500 mb-6">Do you really want to log out of the system?</p>
-
-                            <div className="flex justify-end space-x-3">
-                                <button
-                                    onClick={() => setShowLogoutDialog(false)}
-                                    className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
-                                >
-                                    Cancel
-                                </button>
-                                <button
-                                    onClick={() => {
-                                        useAuthStore.getState().logout();
-                                        setShowLogoutDialog(false);
-                                        navigate('/login')
-                                    }}
-                                    className="px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors"
-                                >
-                                    Log out
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                )}
             </div>
         </aside>
+
+        {/* Logout confirmation lives OUTSIDE <aside> so its fixed overlay is
+            positioned to the viewport, not the transformed sidebar */}
+        {showLogoutDialog && (
+            <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center">
+                {/* White Box */}
+                <div className="bg-white rounded-xl shadow-2xl p-6 max-w-sm w-full mx-4">
+                    <h2 className="text-xl font-bold text-gray-900 mb-2">Log out</h2>
+                    <p className="text-gray-500 mb-6">Do you really want to log out of the system?</p>
+
+                    <div className="flex justify-end space-x-3">
+                        <button
+                            onClick={() => setShowLogoutDialog(false)}
+                            className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            onClick={() => {
+                                useAuthStore.getState().logout();
+                                setShowLogoutDialog(false);
+                                navigate('/login')
+                            }}
+                            className="px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors"
+                        >
+                            Log out
+                        </button>
+                    </div>
+                </div>
+            </div>
+        )}
     </>
 );
 };
