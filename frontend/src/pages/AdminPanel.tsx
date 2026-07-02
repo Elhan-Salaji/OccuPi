@@ -78,7 +78,7 @@ const AdminPanel = () => {
                             status === 409 ? 'Raum-ID existiert bereits.' : 'Fehler beim Speichern.');
                     }
                 }}>
-                    <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-4 mb-4">
                         <input
                             type="text"
                             placeholder="Raum-ID"
@@ -153,15 +153,16 @@ const AdminPanel = () => {
             {/* Room Table */}
             <section className="bg-white rounded-xl shadow p-6">
                 <h2 className="text-xl font-semibold text-gray-900 mb-4">Rooms</h2>
+                <div className="overflow-x-auto">
                 <table className="w-full text-left">
                     <thead>
                         <tr className="border-b border-gray-200 text-gray-500 text-sm">
-                            <th className="pb-3">Raum-ID</th>
-                            <th className="pb-3">Name</th>
-                            <th className="pb-3">Gebäude</th>
-                            <th className="pb-3">Etage</th>
-                            <th className="pb-3">Kapazität</th>
-                            <th className="pb-3">Aktionen</th>
+                            <th className="pb-3 pr-6 whitespace-nowrap">Raum-ID</th>
+                            <th className="pb-3 pr-6 whitespace-nowrap">Name</th>
+                            <th className="pb-3 pr-6 whitespace-nowrap">Gebäude</th>
+                            <th className="pb-3 pr-6 whitespace-nowrap">Etage</th>
+                            <th className="pb-3 pr-6 whitespace-nowrap">Kapazität</th>
+                            <th className="pb-3 pr-6 whitespace-nowrap">Aktionen</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -177,11 +178,11 @@ const AdminPanel = () => {
                         ))
                     ) : ( rooms.map((room) =>
                     <tr key={room.roomId} className="border-b border-gray-100">
-                        <td className="py-3">{room.roomId}</td>
-                        <td className="py-3">{room.name}</td>
-                        <td className="py-3">{room.building}</td>
-                        <td className="py-3">{room.floor}</td>
-                        <td className="py-3">{room.capacity}</td>
+                        <td className="py-3 pr-6 whitespace-nowrap">{room.roomId}</td>
+                        <td className="py-3 pr-6 whitespace-nowrap">{room.name}</td>
+                        <td className="py-3 pr-6 whitespace-nowrap">{room.building}</td>
+                        <td className="py-3 pr-6 whitespace-nowrap">{room.floor}</td>
+                        <td className="py-3 pr-6 whitespace-nowrap">{room.capacity}</td>
                         <td className="py-3 flex gap-2">
                             <button onClick={() => { setFormData(room);
                             setEditingId(room.roomId); }}
@@ -197,6 +198,7 @@ const AdminPanel = () => {
                     ))}
                     </tbody>
                 </table>
+                </div>
             </section>
 
             {/* Delete Confirmation Dialog*/}

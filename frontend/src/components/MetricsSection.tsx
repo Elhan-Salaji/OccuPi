@@ -42,34 +42,36 @@ export function MetricsSection() {
             ) : metrics.length === 0 ? (
                 <p className="text-gray-400">Keine Sensoren melden aktuell Metriken.</p>
             ) : (
+                <div className="overflow-x-auto">
                 <table className="w-full text-left">
                     <thead>
                     <tr className="border-b border-gray-200 text-gray-500 text-sm">
-                        <th className="pb-3">Sensor</th>
-                        <th className="pb-3">CPU</th>
-                        <th className="pb-3">RAM</th>
-                        <th className="pb-3">Queue</th>
-                        <th className="pb-3">Gesendet</th>
-                        <th className="pb-3">Verworfen</th>
-                        <th className="pb-3">Ø Zeit</th>
-                        <th className="pb-3">Aktualisiert</th>
+                        <th className="pb-3 pr-6 whitespace-nowrap">Sensor</th>
+                        <th className="pb-3 pr-6 whitespace-nowrap">CPU</th>
+                        <th className="pb-3 pr-6 whitespace-nowrap">RAM</th>
+                        <th className="pb-3 pr-6 whitespace-nowrap">Queue</th>
+                        <th className="pb-3 pr-6 whitespace-nowrap">Gesendet</th>
+                        <th className="pb-3 pr-6 whitespace-nowrap">Verworfen</th>
+                        <th className="pb-3 pr-6 whitespace-nowrap">Ø Zeit</th>
+                        <th className="pb-3 pr-6 whitespace-nowrap">Aktualisiert</th>
                     </tr>
                     </thead>
                     <tbody>
                     {metrics.map((m) => (
                         <tr key={m.sensorId} className="border-b border-gray-100">
-                            <td className="py-3">{m.sensorId}</td>
-                            <td className={`py-3 ${healthColor(m.cpuPercentage)}`}>{Math.round(m.cpuPercentage)}%</td>
-                            <td className={`py-3 ${healthColor(m.memoryPercentage)}`}>{Math.round(m.memoryPercentage)}%</td>
-                            <td className="py-3">{m.queueSize}</td>
-                            <td className="py-3">{m.sent}</td>
-                            <td className="py-3">{m.dropped}</td>
-                            <td className="py-3">{m.avgProcessTime.toFixed(1)} ms</td>
-                            <td className="py-3">{new Date(m.timestamp).toLocaleString('de-DE', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</td>
+                            <td className="py-3 pr-6 whitespace-nowrap">{m.sensorId}</td>
+                            <td className={`py-3 pr-6 whitespace-nowrap ${healthColor(m.cpuPercentage)}`}>{Math.round(m.cpuPercentage)}%</td>
+                            <td className={`py-3 pr-6 whitespace-nowrap ${healthColor(m.memoryPercentage)}`}>{Math.round(m.memoryPercentage)}%</td>
+                            <td className="py-3 pr-6 whitespace-nowrap">{m.queueSize}</td>
+                            <td className="py-3 pr-6 whitespace-nowrap">{m.sent}</td>
+                            <td className="py-3 pr-6 whitespace-nowrap">{m.dropped}</td>
+                            <td className="py-3 pr-6 whitespace-nowrap">{m.avgProcessTime.toFixed(1)} ms</td>
+                            <td className="py-3 pr-6 whitespace-nowrap">{new Date(m.timestamp).toLocaleString('de-DE', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</td>
                         </tr>
                     ))}
                     </tbody>
                 </table>
+                </div>
             )}
         </section>
     );
