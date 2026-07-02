@@ -152,6 +152,9 @@ class ChartServiceImplTest {
     void getHistory_longWindow_neverExceedsMaxPoints() {
         int cap = 10;
         ReflectionTestUtils.setField(service, "maxPoints", cap);
+        // Lift the request cap (#294): this test needs a window far beyond it to
+        // push the slot width past the breakpoint table.
+        ReflectionTestUtils.setField(service, "maxHours", 1000);
         fixClockAt(Instant.parse("2025-01-13T10:00:00Z"));
         when(influxDBClient.query(anyString(), any(QueryOptions.class)))
                 .thenAnswer(inv -> Stream.<Object[]>empty());

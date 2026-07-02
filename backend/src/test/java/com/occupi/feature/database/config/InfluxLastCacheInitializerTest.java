@@ -114,6 +114,32 @@ class InfluxLastCacheInitializerTest {
     }
 
     @Test
+    @DisplayName("does not retry caches that were created successfully")
+    void retryStopsAfterSuccess() throws Exception {
+        stubResponse(201);
+
+        initializer.createLastCaches();
+        initializer.retryMissingLastCaches();
+
+        verify(httpClient, times(2)).send(any(HttpRequest.class), any());
+    }
+
+    @Test
+    @DisplayName("retries failed creations until they succeed, then stops")
+    void retryRetriesFailures() throws Exception {
+        when(response.statusCode()).thenReturn(500, 500, 201, 201);
+        lenient().when(response.body()).thenReturn("");
+        when(httpClient.send(any(HttpRequest.class), any()))
+                .thenReturn(response);
+
+        initializer.createLastCaches();       // both fail (500)
+        initializer.retryMissingLastCaches(); // both succeed (201)
+        initializer.retryMissingLastCaches(); // nothing left to create
+
+        verify(httpClient, times(4)).send(any(HttpRequest.class), any());
+    }
+
+    @Test
     @DisplayName("cache definition carries key column, count 1 and the TTL in seconds")
     void cacheDefinitionJson() {
         String json = InfluxLastCacheInitializer.cacheDefinition(

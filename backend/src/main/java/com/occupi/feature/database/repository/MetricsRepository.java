@@ -13,7 +13,9 @@ import org.springframework.stereotype.Repository;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Stream;
@@ -126,21 +128,18 @@ public class MetricsRepository {
     }
 
     /**
-     * Returns the most recent metrics row for every known sensor, served from the
-     * last value cache — an in-memory lookup that opens no parquet file, so it
-     * stays cheap no matter how much history has accumulated (#294). While the
-     * cache is cold after an InfluxDB restart, a window-function scan over the
-     * last {@link #latestFallbackDays} days fills the gap.
+     * Returns the most recent metrics row for every known sensor: the union of
+     * the last value cache — an in-memory lookup that opens no parquet file and
+     * reaches back its full TTL (#294) — and a window-function scan over the last
+     * {@link #latestFallbackDays} days, taking the newer row per sensor. The
+     * union matters because InfluxDB persists the cache definition but not its
+     * contents: after an InfluxDB restart the cache only knows sensors that have
+     * written since, and the bounded scan restores the rest.
      *
      * @return one latest row per sensor (empty list if no sensor has reported
-     *         within the cache TTL, or within the fallback window on a cold cache)
+     *         within the cache TTL or the fallback window)
      */
     public List<MetricsData> findAllLatest() {
-        List<MetricsData> cached = queryLastCache("");
-        if (!cached.isEmpty()) {
-            return cached;
-        }
-
         String sql = """
                 SELECT %s
                 FROM (
@@ -152,17 +151,37 @@ public class MetricsRepository {
                 WHERE rn = 1
                 """.formatted(SELECT_COLUMNS, SELECT_COLUMNS, MEASUREMENT_NAME, fallbackSince());
 
-        List<MetricsData> result = new ArrayList<>();
+        Map<String, MetricsData> latest = new LinkedHashMap<>();
         try (Stream<Object[]> rows = influxDBClient.query(sql, QueryOptions.defaultQueryOptions())) {
-            rows.forEach(row -> result.add(toMetricsData(row)));
+            rows.forEach(row -> {
+                MetricsData data = toMetricsData(row);
+                latest.put(data.getSensorId(), data);
+            });
         }
-        return result;
+        for (MetricsData data : queryLastCache("")) {
+            latest.merge(data.getSensorId(), data, MetricsRepository::newer);
+        }
+        return List.copyOf(latest.values());
+    }
+
+    private static MetricsData newer(MetricsData a, MetricsData b) {
+        if (a.getTimestamp() == null) {
+            return b;
+        }
+        if (b.getTimestamp() == null) {
+            return a;
+        }
+        return b.getTimestamp().isAfter(a.getTimestamp()) ? b : a;
     }
 
     /**
      * Reads from the last value cache. Returns an empty list when the cache has no
-     * matching rows or cannot be read (missing cache, InfluxDB error) so that
-     * callers can fall back to a bounded scan.
+     * matching rows or cannot be read (missing cache, InfluxDB error, stream broken
+     * mid-read) so that callers degrade to the bounded scan alone. A partial read
+     * is discarded rather than returned — it must never pass for a complete cache
+     * view. Failures are logged at debug: the bounded scan covers the reads while
+     * {@link com.occupi.feature.database.config.InfluxLastCacheInitializer} keeps
+     * retrying the cache creation.
      *
      * @param whereClause optional {@code WHERE} clause (values must be validated
      *                    by the caller), or an empty string for all rows
@@ -177,8 +196,9 @@ public class MetricsRepository {
         try (Stream<Object[]> rows = influxDBClient.query(sql, QueryOptions.defaultQueryOptions())) {
             rows.forEach(row -> result.add(toMetricsData(row)));
         } catch (RuntimeException e) {
-            log.warn("Last value cache '{}' not readable, falling back to bounded scan: {}",
+            log.debug("Last value cache '{}' not readable, relying on the bounded scan: {}",
                     LAST_CACHE_NAME, e.getMessage());
+            return List.of();
         }
         return result;
     }

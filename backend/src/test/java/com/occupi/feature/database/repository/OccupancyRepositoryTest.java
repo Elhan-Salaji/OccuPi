@@ -252,7 +252,7 @@ class OccupancyRepositoryTest {
     class FindAllLatest {
 
         @Test
-        @DisplayName("should serve all rows from the last value cache without scanning")
+        @DisplayName("should union the bounded scan with the last value cache")
         void shouldMapAllRows() {
             Instant ts = Instant.parse("2026-06-14T10:00:00Z");
             when(influxDBClient.query(anyString(), any(QueryOptions.class)))
@@ -269,9 +269,12 @@ class OccupancyRepositoryTest {
             assertEquals(20, result.get(1).getCount());
 
             ArgumentCaptor<String> sqlCaptor = ArgumentCaptor.forClass(String.class);
-            verify(influxDBClient).query(sqlCaptor.capture(), any(QueryOptions.class));
-            assertTrue(sqlCaptor.getValue().contains("last_cache('occupancy'"),
-                    "a warm cache must satisfy the read without a second query");
+            verify(influxDBClient, times(2)).query(sqlCaptor.capture(), any(QueryOptions.class));
+            assertTrue(sqlCaptor.getAllValues().get(0).contains("time >="),
+                    "the scan must constrain the window with a time predicate, "
+                            + "otherwise it reads the entire measurement history");
+            assertTrue(sqlCaptor.getAllValues().get(1).contains("last_cache('occupancy'"),
+                    "the cache read must complement the scan");
         }
 
         @Test
@@ -284,18 +287,25 @@ class OccupancyRepositoryTest {
         }
 
         @Test
-        @DisplayName("should fall back to a time-bounded scan when the cache is empty (guards #273)")
-        void shouldBoundScanByTime() {
+        @DisplayName("should keep cache-only rooms and prefer the newer row per room")
+        void shouldMergeCacheAndScanRows() {
+            Instant older = Instant.parse("2026-06-14T10:00:00Z");
+            Instant newer = Instant.parse("2026-06-14T12:00:00Z");
             when(influxDBClient.query(anyString(), any(QueryOptions.class)))
-                    .thenAnswer(inv -> Stream.empty());
+                    // scan: room-101 only, with the older row
+                    .thenAnswer(inv -> Stream.<Object[]>of(
+                            new Object[]{"room-101", "sensor-A", 5L, 0.8, nanos(older)}))
+                    // cache: newer row for room-101, plus a room the scan window missed
+                    .thenAnswer(inv -> Stream.<Object[]>of(
+                            new Object[]{"room-101", "sensor-A", 9L, 0.9, nanos(newer)},
+                            new Object[]{"room-303", "sensor-C", 2L, 0.7, nanos(older)}));
 
-            repository.findAllLatest();
+            List<OccupancyData> result = repository.findAllLatest();
 
-            ArgumentCaptor<String> sqlCaptor = ArgumentCaptor.forClass(String.class);
-            verify(influxDBClient, times(2)).query(sqlCaptor.capture(), any(QueryOptions.class));
-            assertTrue(sqlCaptor.getAllValues().get(1).contains("time >="),
-                    "the fallback scan must constrain the window with a time predicate, "
-                            + "otherwise it reads the entire measurement history");
+            assertEquals(2, result.size());
+            assertEquals(9, result.get(0).getCount());
+            assertEquals(newer, result.get(0).getTimestamp());
+            assertEquals("room-303", result.get(1).getRoomId());
         }
 
         @Test
@@ -314,13 +324,13 @@ class OccupancyRepositoryTest {
         }
 
         @Test
-        @DisplayName("should fall back to the bounded scan when the cache is not readable")
+        @DisplayName("should tolerate an unreadable cache and return the scan rows")
         void shouldFallBackWhenCacheReadFails() {
             Instant ts = Instant.parse("2026-06-14T10:00:00Z");
             when(influxDBClient.query(anyString(), any(QueryOptions.class)))
-                    .thenThrow(new RuntimeException("could not find cache"))
                     .thenAnswer(inv -> Stream.<Object[]>of(
-                            new Object[]{"room-101", "sensor-A", 5L, 0.8, nanos(ts)}));
+                            new Object[]{"room-101", "sensor-A", 5L, 0.8, nanos(ts)}))
+                    .thenThrow(new RuntimeException("could not find cache"));
 
             List<OccupancyData> result = repository.findAllLatest();
 
