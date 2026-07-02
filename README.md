@@ -338,7 +338,10 @@ Only the values you'll actually touch. Internal service-to-service URLs
 | `SPRING_PROFILES_ACTIVE`       | `dev`                       | `dev` = open, no auth; `prod` = Keycloak JWT      |
 | `INFLUXDB_URL`                 | `http://localhost:8181`     | InfluxDB endpoint (compose sets `http://influxdb:8181`) |
 | `POSTGRES_URL`                 | `jdbc:postgresql://localhost:5432/occupi` | room-metadata DB                   |
-| `occupancy.latest-lookback-days` | `7`                       | how far back the "latest per room" query scans   |
+| `occupancy.latest-lookback-days` | `7`                       | TTL of the InfluxDB last value cache serving "latest per room" |
+| `occupancy.latest-fallback-days` | `2`                       | bounded-scan window that tops up the cache after an InfluxDB restart |
+| `chart.history.max-hours` / `forecast.max-hours` | `168`     | hard cap on the history/forecast request window  |
+| `chart.weekpattern.max-weeks`  | `8`                         | hard cap on the week-pattern request window       |
 
 **Sensor sender** (`raspberry/.env`, copy from `raspberry/.env.example`):
 

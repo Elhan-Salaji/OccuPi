@@ -77,19 +77,21 @@ docker inspect occupi-influxdb3 -f 'nanocpus={{.HostConfig.NanoCpus}} mem={{.Hos
 ```
 
 ### InfluxDB query file limit
-InfluxDB 3 Core writes a new parquet file per table roughly every 10 minutes and — unlike
-Enterprise — never compacts them, so long-lived instances accumulate ~100 files per day
-and table. Core refuses any query that would open more than `--query-file-limit` files
-(default 432 ≈ 3 days): that broke the dashboard's latest-per-room read and the week-pattern
-chart once enough history existed (#294).
+InfluxDB 3 Core writes a new parquet file per table every 10 minutes of data — up to
+144 per table and day (we observe ~100–111) — and, unlike Enterprise, never compacts
+them. Core refuses any query that would open more than `--query-file-limit` files
+(default 432, about 3–4 days of files): that broke the dashboard's latest-per-room read
+and the week-pattern chart once enough history existed (#294).
 
 Two-part mitigation: the *latest* reads now come from InfluxDB's in-memory **last value
 cache** (created by the backend at startup, no parquet involved), and the remaining
-analytic reads run under a raised `--query-file-limit 8192` in the base compose command —
-wide enough for the 8-week week-pattern, and safe here because our files are tiny (~7 KB)
+analytic reads run under a raised `--query-file-limit 10000` in the base compose
+command. The widest capped read is the 8-week week-pattern at up to 56 × 144 ≈ 8,064
+files, so 10000 keeps real headroom; it is safe here because our files are tiny (~7 KB)
 and the prod resource cap above bounds worst-case memory/CPU. The backend additionally
-caps every client-controlled window (history/forecast ≤ 168 h, week-pattern ≤ 8 weeks) so
-no request can exceed the limit.
+caps every client-controlled window (history/forecast ≤ 168 h, week-pattern ≤ 8 weeks) —
+those caps and this limit are coupled: whoever raises a window cap must re-check the
+file arithmetic.
 
 Like the resource cap, the flag needs a one-time manual `up -d influxdb` (auto-deploy
 leaves infra containers alone):
