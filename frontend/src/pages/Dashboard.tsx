@@ -51,7 +51,10 @@ export default function Dashboard() {
                 // grid for rooms
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {pinnedRooms.map((room) => (
-                        <div key={room.roomId} className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 hover:shadow-md transition-shadow cursor-pointer"
+                        <div key={room.roomId}
+                             className={`bg-white rounded-2xl shadow-sm border border-gray-100 p-6 hover:shadow-md transition-shadow cursor-pointer ${
+                                 room.count > room.capacity ? 'ring-2 ring-red-300 animate-pulse' : ''
+                             }`}
                         onClick={() => setSelectedRoom(room)}>
                             <div className="flex justify-between items-start mb-4">
                                 <div>
@@ -76,14 +79,14 @@ export default function Dashboard() {
                             </div>
 
                             {/* small progress bar */}
-                            <div className="mt-4 w-full bg-gray-100 rounded-full h-2">
+                            <div className="mt-4 w-full bg-gray-100 rounded-full h-2 overflow-hidden">
                                 <div
                                     className={`h-2 rounded-full transition-all duration-500 ${
                                         room.occupancyRate === 'unknown' ? 'bg-gray-300' :
                                         room.occupancyRate === 'low' ? 'bg-green-500' :
                                         room.occupancyRate === 'medium' ? 'bg-yellow-500' : 'bg-red-500'
                                     }`}
-                                    style={{ width: `${room.capacity > 0 ? (room.count / room.capacity) * 100 : 0}%` }}
+                                    style={{ width: `${room.capacity > 0 ? Math.min(100,(room.count / room.capacity) * 100) : 0}%` }}
                                 />
                             </div>
                         </div>
