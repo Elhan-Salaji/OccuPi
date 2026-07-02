@@ -8,9 +8,9 @@ import {RoomFilters} from "../components/RoomFilters";
 
 function SummaryCard({label, value}: { label: string; value: string | number }) {
     return (
-        <div className="bg-white rounded-2xl border border-gray-100 p-4">
+        <div className="bg-white rounded-2xl border border-gray-100 p-3 sm:p-4">
             <p className="text-sm text-gray-400 mb-1">{label}</p>
-            <p className="text-2xl font-semibold text-gray-900">{value}</p>
+            <p className="text-xl sm:text-2xl font-semibold text-gray-900">{value}</p>
         </div>
     );
 
@@ -58,7 +58,7 @@ export default function Analytics() {
                 <p className="text-gray-500 mt-2">Campus-Überblick, Filter, Sortierung & Export</p>
             </header>
 
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 mb-8">
                 <SummaryCard label="Räume" value={totalRooms}/>
                 <SummaryCard label="Kapazität" value={totalCapacity}/>
                 <SummaryCard label="Personen anwesend" value={occupancyUnavailable ? '—' : totalPeople}/>
@@ -81,12 +81,12 @@ export default function Analytics() {
                 setSortBy={setSortBy}
             />
 
-            <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
+            <div className="bg-white rounded-2xl border border-gray-100 overflow-x-auto">
                 <table className="w-full">
                     <thead>
                     <tr className="border-b border-gray-100">
                         {columns.map((col) => (
-                            <th key={col} className="text-left px-4 py-3 text-sm font-medium text-gray-600">
+                            <th key={col} className={`text-left px-2 sm:px-4 py-3 text-sm font-medium text-gray-600 ${col === 'Gebäude' || col === 'Etage' ? 'hidden sm:table-cell' : ''}`}>
                                 {col}
                             </th>
                         ))}
@@ -96,17 +96,17 @@ export default function Analytics() {
                     {filteredRooms.map((room) => (
                         <tr key={room.roomId} className="border-b border-gray-100 hover:bg-gray-50 cursor-pointer"
                             onClick={() => setSelectedRoom(room)}>
-                            <td className="px-4 py-3 text-sm font-medium text-gray-900">
+                            <td className="px-2 sm:px-4 py-3 text-sm font-medium text-gray-900 whitespace-nowrap">
                                 {room.name}
                                 <span className="ml-2 text-gray-400 font-normal">{room.roomId}</span>
                             </td>
-                            <td className="px-4 py-3 text-sm text-gray-600">{room.building}</td>
-                            <td className="px-4 py-3 text-sm text-gray-600">{room.floor}</td>
-                            <td className="px-4 py-3 text-sm text-gray-600">{room.occupancyRate === 'unknown' ? '—' : `${room.count} / ${room.capacity}`}</td>
-                            <td className="px-4 py-3 text-sm">
+                            <td className="px-2 sm:px-4 py-3 text-sm text-gray-600 hidden sm:table-cell">{room.building}</td>
+                            <td className="px-2 sm:px-4 py-3 text-sm text-gray-600 hidden sm:table-cell">{room.floor}</td>
+                            <td className="px-2 sm:px-4 py-3 text-sm text-gray-600">{room.occupancyRate === 'unknown' ? '—' : `${room.count} / ${room.capacity}`}</td>
+                            <td className="px-2 sm:px-4 py-3 text-sm">
                                 <StatusBadge occupancyRate={room.occupancyRate}/>
                             </td>
-                            <td className="px-4 py-3">
+                            <td className="px-2 sm:px-4 py-3">
                                 <PinButton roomId={room.roomId}/>
                             </td>
                         </tr>
@@ -118,7 +118,7 @@ export default function Analytics() {
                 <RoomDetailModal room={selectedRoom} isOpen={true} onClose={() => setSelectedRoom(null)}/>
             )}
 
-        </div>
+            </div>
 
 
     );
