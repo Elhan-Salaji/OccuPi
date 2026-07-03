@@ -39,6 +39,15 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   live occupancy for room 137 (#201).
 
 ### Changed
+- Re-sliced the backend into strict package-by-feature. The layer-style packages
+  `feature/database`, `feature/receiver` and `feature/provider` are gone: the occupancy
+  and Pi-metrics domains each own their ingestion, persistence and read API in
+  `feature/occupancy` and `feature/metrics`. App-wide infrastructure now sits in
+  `config` (CORS, caching, WebSocket/STOMP, InfluxDB client and last-cache initializer,
+  global exception handler), the security filter chains and the Keycloak role converter
+  in `security`, and the shared helpers `InfluxTime`/`TimeSlots` in `common`; the
+  decision is recorded in `backend/docs/decisions.md`. Java packages only: class names,
+  REST paths and STOMP destinations are unchanged (#307).
 - InfluxDB now runs with `--query-file-limit 10000` (default 432) in the base compose
   command. InfluxDB 3 Core never compacts its 10-minute gen1 parquet files (up to 144
   per table and day), so the default limit rejected every read wider than ~3–4 days —

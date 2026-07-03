@@ -1,7 +1,7 @@
 package com.occupi.feature.room;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.occupi.GlobalExceptionHandler;
+import com.occupi.config.GlobalExceptionHandler;
 import com.occupi.feature.room.dto.RoomRequest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
