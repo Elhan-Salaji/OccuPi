@@ -1,6 +1,6 @@
-package com.occupi.feature.receiver;
+package com.occupi.feature.metrics;
 
-import com.occupi.feature.receiver.dto.Metrics;
+import com.occupi.feature.metrics.dto.Metrics;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

@@ -1,6 +1,6 @@
-package com.occupi.feature.provider;
+package com.occupi.feature.metrics;
 
-import com.occupi.feature.provider.dto.MetricsResponse;
+import com.occupi.feature.metrics.dto.MetricsResponse;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;

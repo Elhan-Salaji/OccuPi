@@ -1,8 +1,6 @@
-package com.occupi.feature.receiver;
+package com.occupi.feature.metrics;
 
-import com.occupi.feature.database.model.MetricsData;
-import com.occupi.feature.database.service.MetricsService;
-import com.occupi.feature.receiver.dto.Metrics;
+import com.occupi.feature.metrics.dto.Metrics;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -61,7 +59,7 @@ class PiMetricsServiceImplTest {
     }
 
     @Test
-    @DisplayName("propagates exceptions from the database layer")
+    @DisplayName("propagates exceptions from the persistence service")
     void process_propagatesException() {
         doThrow(new RuntimeException("db down")).when(metricsService).recordMetrics(any());
 

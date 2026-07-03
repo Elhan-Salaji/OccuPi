@@ -1,8 +1,6 @@
-package com.occupi.feature.receiver;
+package com.occupi.feature.metrics;
 
-import com.occupi.feature.database.model.MetricsData;
-import com.occupi.feature.database.service.MetricsService;
-import com.occupi.feature.receiver.dto.Metrics;
+import com.occupi.feature.metrics.dto.Metrics;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -11,15 +9,12 @@ import org.springframework.stereotype.Service;
  * Implementation of {@link PiMetricsService}.
  *
  * Transforms incoming Pi metrics from the Raspberry Pi into metrics records
- * and persists them via the database layer.
+ * and persists them.
  *
  * Responsibilities:
- * - Map {@link Metrics} (receiver DTO) to {@link MetricsData} (database model)
+ * - Map {@link Metrics} (ingestion DTO) to {@link MetricsData} (persistence model)
  * - Delegate persistence to {@link MetricsService}
  * - Handle null or invalid input gracefully
- *
- * Note: This service follows the Package by Feature pattern and communicates
- * with the database feature only through {@link MetricsService}.
  */
 @Slf4j
 @Service
@@ -57,7 +52,7 @@ public class PiMetricsServiceImpl implements PiMetricsService {
     }
 
     /**
-     * Maps a {@link Metrics} (receiver DTO) to {@link MetricsData} (database model).
+     * Maps a {@link Metrics} (ingestion DTO) to {@link MetricsData} (persistence model).
      *
      * @param metrics the Pi metrics to map
      * @return the mapped metrics data ready for persistence

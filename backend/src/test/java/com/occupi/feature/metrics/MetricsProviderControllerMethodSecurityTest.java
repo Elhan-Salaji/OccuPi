@@ -1,4 +1,4 @@
-package com.occupi.feature.provider;
+package com.occupi.feature.metrics;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;

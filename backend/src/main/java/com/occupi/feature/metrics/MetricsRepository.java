@@ -1,10 +1,9 @@
-package com.occupi.feature.database.repository;
+package com.occupi.feature.metrics;
 
 import com.influxdb.v3.client.InfluxDBClient;
 import com.influxdb.v3.client.Point;
 import com.influxdb.v3.client.query.QueryOptions;
 import com.occupi.common.InfluxTime;
-import com.occupi.feature.database.model.MetricsData;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;

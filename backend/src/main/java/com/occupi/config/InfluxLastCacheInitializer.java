@@ -1,6 +1,6 @@
 package com.occupi.config;
 
-import com.occupi.feature.database.repository.MetricsRepository;
+import com.occupi.feature.metrics.MetricsRepository;
 import com.occupi.feature.occupancy.OccupancyRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

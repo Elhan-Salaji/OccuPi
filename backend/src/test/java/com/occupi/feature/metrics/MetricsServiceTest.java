@@ -1,7 +1,5 @@
-package com.occupi.feature.database.service;
+package com.occupi.feature.metrics;
 
-import com.occupi.feature.database.model.MetricsData;
-import com.occupi.feature.database.repository.MetricsRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;

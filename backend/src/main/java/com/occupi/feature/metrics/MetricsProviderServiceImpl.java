@@ -1,8 +1,6 @@
-package com.occupi.feature.provider;
+package com.occupi.feature.metrics;
 
-import com.occupi.feature.database.model.MetricsData;
-import com.occupi.feature.database.repository.MetricsRepository;
-import com.occupi.feature.provider.dto.MetricsResponse;
+import com.occupi.feature.metrics.dto.MetricsResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;

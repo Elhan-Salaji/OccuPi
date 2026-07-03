@@ -1,6 +1,6 @@
-package com.occupi.feature.provider;
+package com.occupi.feature.metrics;
 
-import com.occupi.feature.provider.dto.MetricsResponse;
+import com.occupi.feature.metrics.dto.MetricsResponse;
 
 import java.time.Instant;
 import java.util.List;
