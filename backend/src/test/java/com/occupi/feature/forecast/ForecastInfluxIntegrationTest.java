@@ -1,9 +1,9 @@
 package com.occupi.feature.forecast;
 
 import com.influxdb.v3.client.InfluxDBClient;
-import com.occupi.feature.chart.TimeSlots;
-import com.occupi.feature.database.model.OccupancyData;
-import com.occupi.feature.database.repository.OccupancyRepository;
+import com.occupi.common.TimeSlots;
+import com.occupi.feature.occupancy.OccupancyData;
+import com.occupi.feature.occupancy.OccupancyRepository;
 import com.occupi.feature.forecast.dto.ForecastPoint;
 import com.occupi.feature.forecast.dto.ForecastResponse;
 import org.junit.jupiter.api.AfterAll;
