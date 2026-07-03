@@ -1,4 +1,4 @@
-package com.occupi.feature.authentication;
+package com.occupi.security;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
