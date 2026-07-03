@@ -1,4 +1,4 @@
-package com.occupi.feature.database.config;
+package com.occupi.config;
 
 import com.influxdb.v3.client.InfluxDBClient;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;

@@ -2,8 +2,8 @@ package com.occupi.config;
 
 import com.influxdb.v3.client.InfluxDBClient;
 import com.influxdb.v3.client.query.QueryOptions;
+import com.occupi.common.TimeSlots;
 import com.occupi.feature.chart.ChartService;
-import com.occupi.feature.chart.TimeSlots;
 import com.occupi.feature.forecast.ForecastService;
 import com.occupi.feature.room.RoomService;
 import org.junit.jupiter.api.BeforeEach;

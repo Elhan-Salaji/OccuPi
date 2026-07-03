@@ -1,4 +1,4 @@
-package com.occupi.feature.database.config;
+package com.occupi.config;
 
 import com.occupi.feature.database.repository.MetricsRepository;
 import com.occupi.feature.database.repository.OccupancyRepository;
