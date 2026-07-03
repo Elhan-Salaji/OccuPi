@@ -1,6 +1,6 @@
-package com.occupi.feature.receiver;
+package com.occupi.feature.metrics;
 
-import com.occupi.feature.receiver.dto.Metrics;
+import com.occupi.feature.metrics.dto.Metrics;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.messaging.handler.annotation.MessageMapping;
