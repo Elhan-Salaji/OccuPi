@@ -1,8 +1,6 @@
-package com.occupi.feature.provider;
+package com.occupi.feature.occupancy;
 
-import com.occupi.feature.database.model.OccupancyData;
-import com.occupi.feature.database.repository.OccupancyRepository;
-import com.occupi.feature.provider.dto.OccupancyResponse;
+import com.occupi.feature.occupancy.dto.OccupancyResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;

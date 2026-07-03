@@ -1,4 +1,4 @@
-package com.occupi.feature.receiver.dto;
+package com.occupi.feature.occupancy.dto;
 
 import java.time.Instant;
 

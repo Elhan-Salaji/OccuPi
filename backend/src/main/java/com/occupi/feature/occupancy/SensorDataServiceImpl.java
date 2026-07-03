@@ -1,8 +1,6 @@
-package com.occupi.feature.receiver;
+package com.occupi.feature.occupancy;
 
-import com.occupi.feature.database.model.OccupancyData;
-import com.occupi.feature.database.service.OccupancyService;
-import com.occupi.feature.receiver.dto.SensorData;
+import com.occupi.feature.occupancy.dto.SensorData;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
@@ -12,15 +10,12 @@ import org.springframework.stereotype.Service;
  * Implementation of {@link SensorDataService}.
  *
  * Transforms incoming sensor data from the Raspberry Pi into occupancy records
- * and persists them via the database layer.
+ * and persists them.
  *
  * Responsibilities:
- * - Map {@link SensorData} (receiver DTO) to {@link OccupancyData} (database model)
+ * - Map {@link SensorData} (ingestion DTO) to {@link OccupancyData} (persistence model)
  * - Delegate persistence to {@link OccupancyService}
  * - Handle null or invalid input gracefully
- *
- * Note: This service follows the Package by Feature pattern and communicates
- * with the database feature only through {@link OccupancyService}.
  */
 @Slf4j
 @Service
@@ -45,10 +40,8 @@ public class SensorDataServiceImpl implements SensorDataService {
         }
 
         try {
-            // Map SensorData (receiver DTO) to OccupancyData (database model)
             OccupancyData occupancyData = mapToOccupancyData(data);
 
-            // Delegate persistence to the database layer
             occupancyService.recordOccupancy(occupancyData);
 
             messagingTemplate.convertAndSend("/topic/occupancy", data);
@@ -63,7 +56,7 @@ public class SensorDataServiceImpl implements SensorDataService {
     }
 
     /**
-     * Maps a {@link SensorData} (receiver DTO) to {@link OccupancyData} (database model).
+     * Maps a {@link SensorData} (ingestion DTO) to {@link OccupancyData} (persistence model).
      *
      * All fields are copied directly as the two models share the same structure.
      * The mapping is kept simple and explicit to avoid over-engineering.

@@ -1,11 +1,11 @@
-package com.occupi.feature.database.repository;
+package com.occupi.feature.occupancy;
 
 import com.influxdb.v3.client.InfluxDBClient;
 import com.influxdb.v3.client.query.QueryOptions;
 import com.occupi.config.InfluxDBProperties;
 import com.occupi.config.InfluxLastCacheInitializer;
 import com.occupi.feature.database.model.MetricsData;
-import com.occupi.feature.database.model.OccupancyData;
+import com.occupi.feature.database.repository.MetricsRepository;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;

@@ -1,8 +1,8 @@
-package com.occupi.feature.receiver;
+package com.occupi.feature.occupancy;
 
 import com.influxdb.v3.client.InfluxDBClient;
 import com.occupi.AppApplication;
-import com.occupi.feature.receiver.dto.SensorData;
+import com.occupi.feature.occupancy.dto.SensorData;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;

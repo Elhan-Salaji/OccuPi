@@ -1,4 +1,4 @@
-package com.occupi.feature.database.model;
+package com.occupi.feature.occupancy;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;

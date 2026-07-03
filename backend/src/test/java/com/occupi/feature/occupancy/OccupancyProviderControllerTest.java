@@ -1,6 +1,6 @@
-package com.occupi.feature.provider;
+package com.occupi.feature.occupancy;
 
-import com.occupi.feature.provider.dto.OccupancyResponse;
+import com.occupi.feature.occupancy.dto.OccupancyResponse;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

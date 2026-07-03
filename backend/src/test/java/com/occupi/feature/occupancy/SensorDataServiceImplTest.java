@@ -1,8 +1,6 @@
-package com.occupi.feature.receiver;
+package com.occupi.feature.occupancy;
 
-import com.occupi.feature.database.model.OccupancyData;
-import com.occupi.feature.database.service.OccupancyService;
-import com.occupi.feature.receiver.dto.SensorData;
+import com.occupi.feature.occupancy.dto.SensorData;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;

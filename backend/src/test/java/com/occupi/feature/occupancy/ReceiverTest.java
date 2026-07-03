@@ -1,13 +1,12 @@
-package com.occupi.feature.receiver;
+package com.occupi.feature.occupancy;
 
-import com.occupi.feature.receiver.dto.SensorData;
+import com.occupi.feature.occupancy.dto.SensorData;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import com.occupi.feature.receiver.Receiver;
 import java.time.Instant;
 
 import static org.mockito.Mockito.verify;
