@@ -1,4 +1,4 @@
-package com.occupi.feature.authentication;
+package com.occupi.security;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;

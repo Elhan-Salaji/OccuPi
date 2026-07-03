@@ -1,4 +1,4 @@
-package com.occupi.feature.authentication;
+package com.occupi.security;
 
 import com.occupi.feature.room.RoomController;
 import com.occupi.feature.room.RoomService;
