@@ -1,4 +1,4 @@
-package com.occupi.feature.database.config;
+package com.occupi.config;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;

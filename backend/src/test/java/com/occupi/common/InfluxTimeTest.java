@@ -1,4 +1,4 @@
-package com.occupi.feature.database;
+package com.occupi.common;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;

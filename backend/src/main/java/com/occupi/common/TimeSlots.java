@@ -1,4 +1,4 @@
-package com.occupi.feature.chart;
+package com.occupi.common;
 
 import java.time.Duration;
 import java.time.Instant;

@@ -1,6 +1,7 @@
 package com.occupi.feature.chart;
 
 import com.influxdb.v3.client.InfluxDBClient;
+import com.occupi.common.TimeSlots;
 import com.occupi.feature.chart.dto.HistoryPoint;
 import com.occupi.feature.chart.dto.HistoryResponse;
 import com.occupi.feature.database.model.OccupancyData;

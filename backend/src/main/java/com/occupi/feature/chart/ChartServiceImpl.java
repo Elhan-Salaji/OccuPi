@@ -2,13 +2,14 @@ package com.occupi.feature.chart;
 
 import com.influxdb.v3.client.InfluxDBClient;
 import com.influxdb.v3.client.query.QueryOptions;
+import com.occupi.common.InfluxTime;
+import com.occupi.common.TimeSlots;
 import com.occupi.config.CacheConfig;
 import com.occupi.feature.chart.dto.HistoryPoint;
 import com.occupi.feature.chart.dto.HistoryResponse;
 import com.occupi.feature.chart.dto.WeekPatternExtreme;
 import com.occupi.feature.chart.dto.WeekPatternResponse;
 import com.occupi.feature.chart.dto.WeekPatternSlot;
-import com.occupi.feature.database.InfluxTime;
 import com.occupi.feature.room.RoomService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;

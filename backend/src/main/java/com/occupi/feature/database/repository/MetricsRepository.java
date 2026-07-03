@@ -3,7 +3,7 @@ package com.occupi.feature.database.repository;
 import com.influxdb.v3.client.InfluxDBClient;
 import com.influxdb.v3.client.Point;
 import com.influxdb.v3.client.query.QueryOptions;
-import com.occupi.feature.database.InfluxTime;
+import com.occupi.common.InfluxTime;
 import com.occupi.feature.database.model.MetricsData;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -180,7 +180,7 @@ public class MetricsRepository {
      * mid-read) so that callers degrade to the bounded scan alone. A partial read
      * is discarded rather than returned — it must never pass for a complete cache
      * view. Failures are logged at debug: the bounded scan covers the reads while
-     * {@link com.occupi.feature.database.config.InfluxLastCacheInitializer} keeps
+     * {@link com.occupi.config.InfluxLastCacheInitializer} keeps
      * retrying the cache creation.
      *
      * @param whereClause optional {@code WHERE} clause (values must be validated

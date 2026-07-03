@@ -1,4 +1,4 @@
-package com.occupi.feature.database;
+package com.occupi.common;
 
 import java.math.BigInteger;
 import java.time.Instant;

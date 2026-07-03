@@ -1,4 +1,4 @@
-package com.occupi.feature.database.config;
+package com.occupi.config;
 
 import lombok.Data;
 import org.springframework.boot.context.properties.ConfigurationProperties;
