@@ -1,6 +1,6 @@
-package com.occupi.feature.provider;
+package com.occupi.feature.occupancy;
 
-import com.occupi.feature.provider.dto.OccupancyResponse;
+import com.occupi.feature.occupancy.dto.OccupancyResponse;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;

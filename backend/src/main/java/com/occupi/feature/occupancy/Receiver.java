@@ -1,6 +1,6 @@
-package com.occupi.feature.receiver;
+package com.occupi.feature.occupancy;
 
-import com.occupi.feature.receiver.dto.SensorData;
+import com.occupi.feature.occupancy.dto.SensorData;
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.stereotype.Controller;
 

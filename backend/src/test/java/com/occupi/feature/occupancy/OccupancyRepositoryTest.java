@@ -1,9 +1,8 @@
-package com.occupi.feature.database.repository;
+package com.occupi.feature.occupancy;
 
 import com.influxdb.v3.client.InfluxDBClient;
 import com.influxdb.v3.client.Point;
 import com.influxdb.v3.client.query.QueryOptions;
-import com.occupi.feature.database.model.OccupancyData;
 import org.apache.arrow.vector.util.Text;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
