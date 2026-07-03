@@ -2,7 +2,7 @@ package com.occupi.feature.forecast;
 
 import com.influxdb.v3.client.InfluxDBClient;
 import com.influxdb.v3.client.query.QueryOptions;
-import com.occupi.app.CacheConfig;
+import com.occupi.config.CacheConfig;
 import com.occupi.feature.chart.TimeSlots;
 import com.occupi.feature.database.InfluxTime;
 import com.occupi.feature.forecast.dto.ForecastPoint;

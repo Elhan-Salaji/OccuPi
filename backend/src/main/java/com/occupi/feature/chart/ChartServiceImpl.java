@@ -2,7 +2,7 @@ package com.occupi.feature.chart;
 
 import com.influxdb.v3.client.InfluxDBClient;
 import com.influxdb.v3.client.query.QueryOptions;
-import com.occupi.app.CacheConfig;
+import com.occupi.config.CacheConfig;
 import com.occupi.feature.chart.dto.HistoryPoint;
 import com.occupi.feature.chart.dto.HistoryResponse;
 import com.occupi.feature.chart.dto.WeekPatternExtreme;

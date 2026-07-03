@@ -1,4 +1,4 @@
-package com.occupi; // ← change this to match the folder you place it in
+package com.occupi.config;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;

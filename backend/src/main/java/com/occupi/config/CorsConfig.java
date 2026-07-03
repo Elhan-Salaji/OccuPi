@@ -1,4 +1,4 @@
-package com.occupi.app;
+package com.occupi.config;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;

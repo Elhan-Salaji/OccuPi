@@ -1,4 +1,4 @@
-package com.occupi.app;
+package com.occupi.config;
 
 import com.influxdb.v3.client.InfluxDBClient;
 import com.influxdb.v3.client.query.QueryOptions;

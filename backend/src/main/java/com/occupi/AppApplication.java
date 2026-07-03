@@ -9,7 +9,7 @@ import org.springframework.scheduling.annotation.EnableScheduling;
  *
  * Lives in the root package {@code com.occupi} so that component scanning,
  * JPA entity/repository scanning and auto-configuration package detection all
- * cover the {@code com.occupi.feature.*} packages out of the box — no explicit
+ * cover every {@code com.occupi.*} package out of the box — no explicit
  * base-package configuration needed.
  *
  * {@code @EnableScheduling} powers the batched occupancy flush (see OccupancyService).

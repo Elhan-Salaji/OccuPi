@@ -1,6 +1,6 @@
 package com.occupi.feature.forecast;
 
-import com.occupi.GlobalExceptionHandler;
+import com.occupi.config.GlobalExceptionHandler;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
