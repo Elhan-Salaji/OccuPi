@@ -41,6 +41,10 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
     @Autowired
     private ObjectMapper objectMapper;
 
+    /** Same allowed-origin list as the HTTP CORS config — one property, two consumers. */
+    @Autowired
+    private CorsProperties corsProperties;
+
     /**
      * Registers a custom STOMP message converter backed by the Spring Boot
      * auto-configured Jackson 3 ObjectMapper.
@@ -115,21 +119,17 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
      */
     @Override
     public void registerStompEndpoints(StompEndpointRegistry registry) {
+        String[] allowedOrigins = corsProperties.getAllowedOrigins().toArray(String[]::new);
+
         // Raw WebSocket endpoint for native clients (Raspberry Pi / stomp.py)
         registry
                 .addEndpoint("/ws")
-                .setAllowedOriginPatterns(
-                        "http://localhost:*",
-                        "https://occupi.mi.hdm-stuttgart.de"
-                );
+                .setAllowedOriginPatterns(allowedOrigins);
 
         // SockJS endpoint for browser clients
         registry
                 .addEndpoint("/ws/occupancy")
-                .setAllowedOriginPatterns(
-                        "http://localhost:*",
-                        "https://occupi.mi.hdm-stuttgart.de"
-                )
+                .setAllowedOriginPatterns(allowedOrigins)
                 .withSockJS();
     }
 
