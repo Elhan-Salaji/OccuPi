@@ -22,6 +22,11 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   (`[A-Za-z0-9._-]{1,64}`), auto-registration is capped
   (`OCCUPI_SENSOR_AUTOREGISTER_CAP`, default 100) because `/ws` is unauthenticated,
   and a registry outage drops single messages instead of killing the STOMP session (#310).
+- The backend seeds rooms at startup when `OCCUPI_SEED_ROOMS` is set
+  (`roomId:capacity` pairs, e.g. `006:20,011:15`): create-if-missing, existing rooms
+  are never touched, a malformed spec aborts startup with a message naming the bad
+  entry. Built for the upcoming one-command local stack, where the same value drives
+  the mock Pi fleet and the room seed; unset (the server case) the seeder is inert (#312).
 - Server-side demo data seed (`deploy/seed-demo-data.py`): drops and rewrites the
   InfluxDB `occupancy` table with eight weeks of 5-minute occupancy history — as
   backfill for the live demo rooms and shaped per dashboard edge case for the static
@@ -53,6 +58,12 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   live occupancy for room 137 (#201).
 
 ### Changed
+- The backend's InfluxDB connection (`INFLUXDB_URL`/`INFLUXDB_DATABASE`/`INFLUXDB_TOKEN`)
+  and the CORS origins (`CORS_ALLOWED_ORIGINS`, comma-separated patterns) are now plain
+  environment variables with the previous values as local defaults. The origin list is
+  one property consumed by both the HTTP CORS config and the WebSocket handshake — the
+  two hardcoded copies could drift apart before. The open `dev` profile now logs a loud
+  startup warning, since it is the default for unconfigured deployments (#309).
 - Re-sliced the backend into strict package-by-feature. The layer-style packages
   `feature/database`, `feature/receiver` and `feature/provider` are gone: the occupancy
   and Pi-metrics domains each own their ingestion, persistence and read API in
