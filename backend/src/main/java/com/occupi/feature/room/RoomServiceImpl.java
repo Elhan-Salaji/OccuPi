@@ -2,6 +2,8 @@ package com.occupi.feature.room;
 
 import com.occupi.feature.room.dto.RoomRequest;
 import com.occupi.feature.room.dto.RoomResponse;
+import com.occupi.feature.sensor.Sensor;
+import com.occupi.feature.sensor.SensorRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -18,6 +20,7 @@ import java.util.Optional;
 public class RoomServiceImpl implements RoomService {
 
     private final RoomRepository roomRepository;
+    private final SensorRepository sensorRepository;
 
     @Override
     public List<RoomResponse> getAllRooms() {
@@ -67,6 +70,14 @@ public class RoomServiceImpl implements RoomService {
     public void deleteRoom(String roomId) {
         if (!roomRepository.existsById(roomId)) {
             throw new RoomNotFoundException(roomId);
+        }
+        // Overrides are a real FK — the database would block this delete anyway;
+        // checking first turns an opaque 500 into a 409 that names the sensors.
+        List<String> assigned = sensorRepository.findByOverrideRoomId(roomId).stream()
+                .map(Sensor::getSensorId)
+                .toList();
+        if (!assigned.isEmpty()) {
+            throw new RoomHasAssignedSensorsException(roomId, assigned);
         }
         roomRepository.deleteById(roomId);
         log.info("Deleted room: {}", roomId);
