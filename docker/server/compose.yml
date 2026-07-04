@@ -1,0 +1,189 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# OccuPi — server deployment. Deliberately fully configured:
+#
+#   cp .env.example .env    → fill in EVERY value (the stack refuses to start
+#   docker compose up -d --build          with missing required variables)
+#
+# Backend and frontend build from source on the server (the VITE_* URLs come
+# from .env as build args — no registry image is tied to one hostname anymore).
+# The systemd timer runs deploy/auto-deploy.sh, which rebuilds on new commits.
+#
+# Data: the project name is pinned to 'occupi' and the volumes attach to the
+# EXISTING volumes of the legacy docker/ stack (external, legacy names) — the
+# move to this file costs zero bytes of data. A fresh server creates them once:
+#   docker volume create docker_influxdb3-data docker_postgres-data
+#
+# Only nginx (deploy/nginx) is public; every port here binds to 127.0.0.1.
+# ─────────────────────────────────────────────────────────────────────────────
+name: occupi
+
+services:
+  backend:
+    build:
+      context: ../../backend
+      dockerfile: Dockerfile
+    container_name: occupi-backend
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      JAVA_TOOL_OPTIONS: -Xms256m -Xmx512m
+      POSTGRES_URL: jdbc:postgresql://postgres:5432/occupi
+      POSTGRES_USER: ${POSTGRES_USER:?set POSTGRES_USER in docker/server/.env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in docker/server/.env}
+      INFLUXDB_URL: http://influxdb:8181
+      INFLUXDB_TOKEN: ${INFLUXDB_TOKEN:?set INFLUXDB_TOKEN in docker/server/.env — see README, token bootstrap}
+      KEYCLOAK_JWK_SET_URI: http://keycloak:8080/auth/realms/occupi/protocol/openid-connect/certs
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:?set CORS_ALLOWED_ORIGINS in docker/server/.env}
+    ports:
+      - "127.0.0.1:8080:8080"
+    depends_on:
+      influxdb:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      keycloak:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/localhost/8080 && printf 'GET /v3/api-docs HTTP/1.0\\r\\n\\r\\n' >&3 && grep -q openapi <&3"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 40s
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ../../frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: https://${PUBLIC_HOST:?set PUBLIC_HOST in docker/server/.env}/api
+        VITE_KEYCLOAK_URL: https://${PUBLIC_HOST}/auth
+        VITE_KEYCLOAK_REALM: occupi
+        VITE_KEYCLOAK_CLIENT_ID: occupi-frontend
+    container_name: occupi-frontend
+    ports:
+      - "127.0.0.1:3000:80"
+    restart: unless-stopped
+
+  influxdb:
+    image: influxdb:3.9.3-core
+    container_name: occupi-influxdb3
+    environment:
+      INFLUXDB3_HOST_ID: occupi-prod
+    # Token auth is ON (no --without-auth, unlike local). First-time setup
+    # creates the admin token once — see README "InfluxDB token bootstrap".
+    command: >
+      serve --host-id occupi-prod --http-bind 0.0.0.0:8181
+      --object-store file --data-dir /var/lib/influxdb3
+      --query-file-limit 10000
+    volumes:
+      - influxdb3-data:/var/lib/influxdb3
+    # With auth on, /health also requires the token (verified against 3.9.3-core:
+    # 401 without). During the first-boot token bootstrap the check stays red —
+    # that is expected and documented in the README; `docker exec` works anyway.
+    healthcheck:
+      test: ["CMD", "curl", "-f", "-H", "Authorization: Bearer ${INFLUXDB_TOKEN}", "http://localhost:8181/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    # One heavy query must never starve the single-core host (#273).
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 2g
+        reservations:
+          memory: 256m
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:16
+    container_name: occupi-postgres
+    environment:
+      POSTGRES_DB: occupi
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ../shared/postgres-init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d occupi"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.2
+    container_name: occupi-keycloak
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_ADMIN:?set KEYCLOAK_ADMIN in docker/server/.env}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:?set KEYCLOAK_ADMIN_PASSWORD in docker/server/.env}
+      KC_HOSTNAME: ${PUBLIC_HOST}
+      KC_HOSTNAME_STRICT: "true"
+      # Served under https://<host>/auth — matches the host nginx /auth route.
+      KC_HTTP_RELATIVE_PATH: /auth/
+      # Keep the management/health endpoint (port 9000) at root, otherwise /auth
+      # also moves /health/ready and the container healthcheck fails.
+      KC_HTTP_MANAGEMENT_RELATIVE_PATH: "/"
+      KC_HTTP_ENABLED: "true"
+      KC_HEALTH_ENABLED: "true"
+      KC_PROXY_HEADERS: xforwarded
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://postgres:5432/keycloak
+      KC_DB_USERNAME: ${POSTGRES_USER}
+      KC_DB_PASSWORD: ${POSTGRES_PASSWORD}
+      # Substituted INSIDE realm-server.json by Keycloak's --import-realm
+      # placeholder support (redirect URIs / webOrigins). Import only applies
+      # when the realm does not exist yet — on the VM the realm already lives
+      # in Postgres, so changes there go through the admin console.
+      OCCUPI_PUBLIC_URL: https://${PUBLIC_HOST}
+    command: start --import-realm
+    volumes:
+      - ./keycloak/realm-server.json:/opt/keycloak/data/import/realm-server.json:ro
+    ports:
+      - "127.0.0.1:8180:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/localhost/9000 && echo -e 'GET /health/ready HTTP/1.0\\r\\n\\r\\n' >&3 && grep -q 'UP' <&3"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:11.6.1
+    container_name: occupi-grafana
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:?set GRAFANA_ADMIN_USER in docker/server/.env}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?set GRAFANA_ADMIN_PASSWORD in docker/server/.env}
+      GF_INSTALL_PLUGINS: influxdata-flightsql-datasource
+      # Consumed by the datasource provisioning file ($INFLUXDB_TOKEN).
+      INFLUXDB_TOKEN: ${INFLUXDB_TOKEN}
+    volumes:
+      - ./grafana/datasources:/etc/grafana/provisioning/datasources:ro
+      - ../shared/grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - grafana-data:/var/lib/grafana
+    # Not proxied by nginx — reach it via an SSH tunnel:
+    #   ssh -L 3001:127.0.0.1:3001 <server>   →  http://localhost:3001
+    ports:
+      - "127.0.0.1:3001:3000"
+    depends_on:
+      influxdb:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  # The legacy stack (project 'docker') created these names; attaching them as
+  # external keeps every byte of data across the restructure. Fresh install:
+  #   docker volume create docker_influxdb3-data docker_postgres-data
+  influxdb3-data:
+    external: true
+    name: docker_influxdb3-data
+  postgres-data:
+    external: true
+    name: docker_postgres-data
+  grafana-data:
