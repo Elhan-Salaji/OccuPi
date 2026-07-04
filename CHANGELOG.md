@@ -8,6 +8,19 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 ### Added
+- `docker/server/`: the deliberately configured counterpart to `docker/local/`. One
+  `.env.example` that must be filled completely — the compose file fail-fasts with
+  `${VAR:?}` on every missing required value (Postgres, Keycloak admin, Grafana
+  admin, `PUBLIC_HOST`, `CORS_ALLOWED_ORIGINS`, `INFLUXDB_TOKEN`), so no silent
+  default passwords survive on a server. Backend and frontend build from source with
+  `VITE_*` derived from `PUBLIC_HOST`; every port binds to 127.0.0.1 (nginx stays the
+  only public entry). InfluxDB runs WITH token auth (bootstrap documented; the
+  healthcheck sends the token — `/health` answers 401 without one). The realm import
+  file uses `${OCCUPI_PUBLIC_URL}` placeholders, substitution verified against
+  Keycloak 26.2. The project name is pinned to `occupi` and the data volumes attach
+  externally to the legacy names (`docker_influxdb3-data`, `docker_postgres-data`) —
+  the VM keeps every byte across the restructure; fresh servers create the two
+  volumes once (#314).
 - `docker/local/`: the complete stack in one command. `cd docker/local && docker
   compose up -d --build` starts backend + frontend (built from source with
   localhost URLs), Postgres, Keycloak (imports a localhost realm with seeded test
