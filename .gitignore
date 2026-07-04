@@ -47,6 +47,10 @@ docker/seed.py
 
 ### Local secrets ###
 docker/.env
+# docker/local/.env is committed on purpose (no secrets, working defaults) —
+# the server and Pi env files hold real secrets and stay out of git.
+docker/server/.env
+raspberry/docker/.env
 
 ### Python (raspberry/) ###
 .venv/
