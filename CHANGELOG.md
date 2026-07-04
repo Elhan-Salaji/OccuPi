@@ -8,6 +8,13 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 ### Added
+- Sensor admin API for the panel's correction path: `GET /api/sensors` lists every
+  device with claim, effective room, derived status (claimed / overridden /
+  unresolved), last seen and dropped-point counters; `PUT /api/sensors/{id}/assignment`
+  assigns a room (override), `DELETE .../assignment` clears it, `PUT /{id}` renames,
+  `DELETE /{id}` removes the entry. Writes require the Keycloak `admin` role at both
+  the URL and method level, like rooms. Deleting a room that still has assigned
+  sensors now fails with `409` naming the sensors instead of an opaque error (#311).
 - Sensor registry: every Pi that ever reported gets a row in the new Postgres
   `sensors` table (device id, claimed room, admin override, last seen). The room id a
   Pi sends is now a *claim* — it flows into exactly that room the moment a matching
