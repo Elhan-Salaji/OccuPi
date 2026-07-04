@@ -21,10 +21,12 @@ spring:
       ddl-auto: update
     open-in-view: false
 
+# Same env-with-local-default pattern as the datasource above: Docker/prod override
+# via INFLUXDB_*, a bare local run works without any environment.
 influxdb:
-  url: http://localhost:8181
-  database: occupi
-  token: ""
+  url: ${INFLUXDB_URL:http://localhost:8181}
+  database: ${INFLUXDB_DATABASE:occupi}
+  token: ${INFLUXDB_TOKEN:}
 
 # "Latest per room / per sensor" reads are the union of InfluxDB's in-memory last
 # value cache (#294) — latest-lookback-days is that cache's TTL — and a scan
