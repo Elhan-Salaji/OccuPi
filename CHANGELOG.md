@@ -8,6 +8,20 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 ### Added
+- Sensor registry: every Pi that ever reported gets a row in the new Postgres
+  `sensors` table (device id, claimed room, admin override, last seen). The room id a
+  Pi sends is now a *claim* — it flows into exactly that room the moment a matching
+  room exists, with no admin step. An admin override corrects a wrong claim and
+  expires automatically when the Pi reports a new claim (a freshly edited Pi `.env`
+  wins over an old correction); an override is a real foreign key, so a room with
+  assigned sensors cannot be deleted. Data from an unresolved device (claim matches
+  no room) is no longer written under an invisible tag — the old silent-typo trap:
+  the points are dropped and counted, the device stays visible with `lastSeen` via
+  its metrics stream, and both the persisted point and the `/topic/occupancy`
+  broadcast always carry the *effective* room. Ingest ids are validated
+  (`[A-Za-z0-9._-]{1,64}`), auto-registration is capped
+  (`OCCUPI_SENSOR_AUTOREGISTER_CAP`, default 100) because `/ws` is unauthenticated,
+  and a registry outage drops single messages instead of killing the STOMP session (#310).
 - The backend seeds rooms at startup when `OCCUPI_SEED_ROOMS` is set
   (`roomId:capacity` pairs, e.g. `006:20,011:15`): create-if-missing, existing rooms
   are never touched, a malformed spec aborts startup with a message naming the bad
