@@ -24,7 +24,6 @@ services:
     build:
       context: ../../backend
       dockerfile: Dockerfile
-    container_name: occupi-backend
     environment:
       SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
       POSTGRES_URL: jdbc:postgresql://postgres:5432/occupi
@@ -44,10 +43,10 @@ services:
         condition: service_healthy
       keycloak:
         condition: service_healthy
-    # temurin-jre has no curl; the /dev/tcp probe is the same trick the keycloak
-    # healthcheck uses. /v3/api-docs is open in both profiles.
+    # temurin-jre has no curl, and its /bin/sh is dash — /dev/tcp needs bash,
+    # so the probe runs bash explicitly. /v3/api-docs is open in both profiles.
     healthcheck:
-      test: ["CMD-SHELL", "exec 3<>/dev/tcp/localhost/8080 && echo -e 'GET /v3/api-docs HTTP/1.0\\r\\n\\r\\n' >&3 && grep -q 'openapi' <&3"]
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/localhost/8080 && printf 'GET /v3/api-docs HTTP/1.0\\r\\n\\r\\n' >&3 && grep -q openapi <&3"]
       interval: 10s
       timeout: 5s
       retries: 12
@@ -63,7 +62,6 @@ services:
         VITE_KEYCLOAK_URL: http://localhost:8180
         VITE_KEYCLOAK_REALM: occupi
         VITE_KEYCLOAK_CLIENT_ID: occupi-frontend
-    container_name: occupi-frontend
     ports:
       - "3000:80"
     restart: unless-stopped
@@ -71,7 +69,6 @@ services:
   mock:
     build:
       context: ./mock
-    container_name: occupi-mock
     environment:
       MOCK_ROOMS: ${MOCK_ROOMS}
       BACKEND_HOST: backend
@@ -85,7 +82,6 @@ services:
 
   influxdb:
     image: influxdb:3.9.3-core
-    container_name: occupi-influxdb3
     environment:
       INFLUXDB3_HOST_ID: occupi-local
     # --without-auth is fine here: the port is only published to your machine.
@@ -108,7 +104,6 @@ services:
 
   postgres:
     image: postgres:16
-    container_name: occupi-postgres
     environment:
       POSTGRES_DB: occupi
       POSTGRES_USER: ${POSTGRES_USER:-occupi}
@@ -127,7 +122,6 @@ services:
 
   keycloak:
     image: quay.io/keycloak/keycloak:26.2
-    container_name: occupi-keycloak
     environment:
       KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_ADMIN:-admin}
       KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-admin}
@@ -160,7 +154,6 @@ services:
 
   grafana:
     image: grafana/grafana:11.6.1
-    container_name: occupi-grafana
     environment:
       GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}

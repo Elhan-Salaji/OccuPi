@@ -40,7 +40,7 @@
         {
           "refId": "A",
           "rawEditor": true,
-          "queryText": "SELECT time, \"count\", \"roomId\" FROM occupancy WHERE \"roomId\" IN (${room:sqlstring}) AND $__timeRangeFilter(time) ORDER BY time"
+          "queryText": "SELECT time, \"count\", \"roomId\" FROM occupancy WHERE \"roomId\" IN (${room:sqlstring}) AND $__timeRange(time) ORDER BY time"
         }
       ],
       "transformations": [
@@ -71,7 +71,7 @@
         {
           "refId": "A",
           "rawEditor": true,
-          "queryText": "SELECT \"roomId\", MAX_BY(\"count\", time) AS \"count\" FROM occupancy WHERE \"roomId\" IN (${room:sqlstring}) AND time >= now() - INTERVAL '1 hour' GROUP BY \"roomId\" ORDER BY \"roomId\""
+          "queryText": "SELECT \"roomId\", selector_last(\"count\", time)['value'] AS \"count\" FROM occupancy WHERE \"roomId\" IN (${room:sqlstring}) AND time >= now() - INTERVAL '1 hour' GROUP BY \"roomId\" ORDER BY \"roomId\""
         }
       ]
     }
