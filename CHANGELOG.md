@@ -8,6 +8,11 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 ### Added
+- The backend seeds rooms at startup when `OCCUPI_SEED_ROOMS` is set
+  (`roomId:capacity` pairs, e.g. `006:20,011:15`): create-if-missing, existing rooms
+  are never touched, a malformed spec aborts startup with a message naming the bad
+  entry. Built for the upcoming one-command local stack, where the same value drives
+  the mock Pi fleet and the room seed; unset (the server case) the seeder is inert (#312).
 - Server-side demo data seed (`deploy/seed-demo-data.py`): drops and rewrites the
   InfluxDB `occupancy` table with eight weeks of 5-minute occupancy history — as
   backfill for the live demo rooms and shaped per dashboard edge case for the static
