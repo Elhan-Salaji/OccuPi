@@ -4,10 +4,10 @@ Room-occupancy monitoring for HdM Stuttgart. A ceiling-mounted TI IWR6843 mmWave
 radar counts people in a room without cameras or personal data, streams the headcount
 to a backend, and a web dashboard shows current and historical occupancy per room.
 
-The system runs as five Docker services (backend, frontend, InfluxDB, PostgreSQL,
-Keycloak). The sensor part is a separate Python sender that runs on a Raspberry Pi or
-any mini-PC and talks to the backend over WebSocket — it ships with a **mock mode** so
-you can run the whole pipeline with no hardware at all.
+Everything runs in Docker, split by decision instead of by overlay: `docker/local/`
+starts the complete stack out of the box (including a simulated Pi fleet — no
+hardware, no clicks), `docker/server/` is the deliberately configured deployment,
+and `raspberry/docker/` runs the real sensor on a Pi.
 
 ---
 
@@ -15,15 +15,13 @@ you can run the whole pipeline with no hardware at all.
 
 - [Architecture](#architecture)
 - [Repository layout](#repository-layout)
-- [Prerequisites](#prerequisites)
-- [Quick start — local, mock data, no hardware](#quick-start--local-mock-data-no-hardware)
-- [Where things run (local)](#where-things-run-local)
+- [Quick start — local, three commands](#quick-start--local-three-commands)
+- [Adding a room and a real Pi](#adding-a-room-and-a-real-pi)
 - [Local development from source](#local-development-from-source)
-- [Data source on a Raspberry Pi / mini-PC](#data-source-on-a-raspberry-pi--mini-pc)
-- [Mock vs. real data](#mock-vs-real-data)
 - [Running on the server (production)](#running-on-the-server-production)
-- [Web UI, authentication, and Grafana](#web-ui-authentication-and-grafana)
+- [Authentication and Grafana](#authentication-and-grafana)
 - [Configuration reference](#configuration-reference)
+- [REST API](#rest-api-under-api)
 - [Troubleshooting](#troubleshooting)
 - [Known gaps / TODO](#known-gaps--todo)
 
@@ -41,128 +39,109 @@ reads over REST and also gets live pushes over WebSocket.
 ┌──────────────────┐   STOMP over WebSocket        ┌───────────────────┐
 │  Pi sender       │   send  /app/data  ──────────▶│  backend          │
 │  raspberry/      │         /app/metrics          │  Spring Boot (8080)│
-│  mock OR real    │   via   /ws  (SockJS: /ws/... )│                   │
+│  real radar      │   via   /ws  (SockJS: /ws/... )│                   │
 └──────────────────┘                               │  REST  /api/*  ◀───┼── frontend SPA
-                                                    │  push  /topic/... ─┼──▶ React/Vite
-                                                    └───────┬───────────┘   (nginx :3000)
+   (simulated fleet:                                │  push  /topic/... ─┼──▶ React/Vite
+    docker/local/mock)                              └───────┬───────────┘   (nginx :3000)
                                     ┌───────────────────────┼────────────────────────┐
                                     ▼                        ▼                         ▼
                             ┌──────────────┐         ┌──────────────┐          ┌──────────────┐
                             │ InfluxDB 3   │         │ PostgreSQL 16│          │ Keycloak 26  │
-                            │ occupancy +  │         │ room metadata│          │ realm occupi │
-                            │ metrics (TS) │         │ (occupi DB)  │          │ (JWT, prod)  │
+                            │ occupancy +  │         │ rooms +      │          │ realm occupi │
+                            │ metrics (TS) │         │ sensors      │          │ (JWT, prod)  │
                             └──────┬───────┘         └──────────────┘          └──────────────┘
-                                   │ FlightSQL (network: mmwave-net)
+                                   │ FlightSQL
                             ┌──────────────┐
-                            │ Grafana      │  optional, standalone
+                            │ Grafana      │  provisioned in both stacks (:3001)
                             └──────────────┘
 ```
 
 - **Backend** — Spring Boot 4 (Java 21). Ingests sensor data over STOMP/WebSocket,
-  stores occupancy and Pi health metrics as time series in InfluxDB, keeps room
-  metadata in PostgreSQL, and serves read APIs under `/api`. Auth is profile-driven:
-  the `dev` profile is fully open; the `prod` profile validates Keycloak JWTs.
-- **Frontend** — React 19 + Vite 8 single-page app, served by nginx in the container.
-  Calls the REST API and subscribes to `/topic/occupancy` for live updates.
-- **Pi sender** (`raspberry/`) — standalone Python app. Reads the mmWave radar over two
-  USB serial ports (`real`) or generates believable curves (`mock`), and publishes one
-  reading per frame to the backend. Runs on a Pi/mini-PC, separate from the server stack.
-- **InfluxDB 3 Core** — time-series store for occupancy and metrics (measurement
-  `occupancy`, database `occupi`). Runs without auth on the internal network.
-- **PostgreSQL 16** — room metadata (database `occupi`) and Keycloak's own database.
-- **Keycloak 26** — OAuth2/OIDC provider (realm `occupi`), backed by HdM LDAP in prod.
-- **Grafana** — optional, standalone dashboards straight off InfluxDB via FlightSQL.
+  resolves which room a device feeds through the **sensor registry** (the Pi's
+  `ROOM_ID` is a claim; an admin override corrects mistakes and expires when the Pi
+  reports a new claim — [ADR 0002](docs/adr/0002-sensor-claim-and-override-mapping.md)),
+  stores occupancy and Pi health metrics in InfluxDB, room metadata and the registry
+  in PostgreSQL, and serves read APIs under `/api`. Auth is profile-driven: `dev` is
+  fully open; `prod` validates Keycloak JWTs.
+- **Frontend** — React 19 + Vite 8 single-page app, served by nginx. Calls the REST
+  API and subscribes to `/topic/occupancy` for live updates.
+- **Pi sender** (`raspberry/`) — Python client for the real radar, one Pi = one radar
+  = one room. Simulated Pis live in `docker/local/mock/`.
+- **InfluxDB 3 Core** — time series (`occupancy`, `metrics`). Local: without auth,
+  port only on your machine. Server: token auth.
+- **PostgreSQL 16** — `rooms`, `sensors` (registry) and Keycloak's database.
+- **Keycloak 26** — OAuth2/OIDC (realm `occupi`), HdM LDAP federation; the local
+  realm adds seeded test users.
+- **Grafana** — provisioned FlightSQL datasource + room dashboard in both stacks.
 
-Design decisions and deeper background live in the
-[project wiki](https://github.com/Elhan-Salaji/OccuPi/wiki).
+Decisions live in [`docs/adr/`](docs/adr/); the per-part logs
+(`backend/docs/decisions.md`, `raspberry/docs/decisions.md`) link there.
 
 ## Repository layout
 
 ```
 backend/     Spring Boot service (Maven, ./mvnw), REST + WebSocket ingestion
-frontend/    React/Vite SPA (also contains grafana/ — the standalone Grafana compose)
-raspberry/   Python sensor sender (mock + real mmWave), its own docker compose
-docker/      Compose files for the full stack: base + local override + prod overlay
-deploy/      Host Nginx config + systemd auto-deploy (server only)
+frontend/    React/Vite SPA
+docker/
+├── local/   the full local stack, out of the box (incl. mock Pi fleet + Grafana)
+├── server/  the deliberately configured server stack (build from source)
+└── shared/  files both stacks mount (postgres init, Grafana dashboard)
+raspberry/   real Pi sender; raspberry/docker/ runs it as a single container
+deploy/      host nginx, systemd auto-deploy, migration runbook, demo seed
+docs/adr/    repo-wide architecture decision records
 ```
 
-## Prerequisites
+## Quick start — local, three commands
 
-Everything runs in Docker, so for the common paths you only need Docker.
-
-- **Docker** with the **Compose v2 plugin** (`docker compose ...`). Required for every path below.
-- **Java 21** — only if you run or build the **backend from source** outside Docker.
-  The Maven wrapper (`backend/mvnw`) is included, so you don't need a system Maven.
-- **Node.js 22** — only if you run the **frontend dev server from source** outside Docker.
-- **Python 3.12** — only if you run the **sensor sender without Docker** (the hardware-free
-  mock path uses `raspberry/run.sh`, which creates its own virtualenv).
-
-## Quick start — local, mock data, no hardware
-
-The fastest way to see the dashboard with live-looking data. Two steps: start the stack,
-then run the mock sender.
-
-**1. Start the full stack** (builds backend + frontend from source, `dev` profile → no login):
+Docker with Compose v2 is the only prerequisite:
 
 ```bash
-cd docker
+git clone https://github.com/Elhan-Salaji/OccuPi.git
+cd OccuPi/docker/local
 docker compose up -d --build
 ```
 
-**2. Feed it mock occupancy** from the Pi sender in mock mode (no hardware, no Docker —
-just Python). One process can simulate several rooms:
+The first start builds backend and frontend and pulls the rest — a few minutes.
+After that the dashboard at **http://localhost:3000** shows live occupancy per room
+without a single click: the simulated Pis send immediately, and the backend seeds
+their rooms into Postgres at startup. The one value worth touching is `MOCK_ROOMS`
+in the committed `.env` (`roomId:capacity` pairs — one virtual Pi per entry).
 
-```bash
-cd raspberry
-SENSOR_MODE=mock BACKEND_HOST=localhost MOCK_ROOM_IDS=006,011,137,i003 ./run.sh
-```
+Details, service URLs, the auth flip and registry walkthroughs:
+[`docker/local/README.md`](docker/local/README.md).
 
-**3. Open the dashboard:** <http://localhost:3000>
+## Adding a room and a real Pi
 
-`run.sh` creates a virtualenv, installs the dependencies, and streams a random-walk
-headcount for each room to the backend at `ws://localhost:8080/ws`. Leave it running;
-stop it with `Ctrl+C`. Stop the stack with `docker compose down` (add `-v` to also drop
-the data volumes).
+1. Create the room in the admin panel (or let the local seed do it).
+2. On the Pi: `cd raspberry/docker && cp .env.example .env`, set `ROOM_ID` (must
+   match the room), `SENSOR_ID` (stable device name, e.g. `pi-bibliothek`) and
+   `RADAR_SERIAL`; then `docker compose up -d --build`.
+3. Data flows immediately — no assignment step. A typo in `ROOM_ID` no longer
+   disappears silently: the device shows up as "ungeklärt" in the admin panel
+   (with a counter of dropped points) and can be assigned to a room there. An
+   admin assignment wins until the Pi reports a new `ROOM_ID` from its `.env`.
 
-> **Why a separate sender for mock data?** There is no data generator inside the backend.
-> Mock data is produced by the Pi sender in mock mode — it's the same code path the real
-> sensor uses, just with a fake source. See [Known gaps](#known-gaps--todo).
-
-## Where things run (local)
-
-With the local stack up (`docker compose up -d` in `docker/`), these are published on the host:
-
-| Service        | URL / port                  | Notes                                        |
-|----------------|-----------------------------|----------------------------------------------|
-| Frontend (SPA) | <http://localhost:3000>     | nginx serving the built app                  |
-| Backend API    | <http://localhost:8080>     | REST under `/api`, WebSocket under `/ws`     |
-| Swagger UI     | <http://localhost:8080/swagger-ui.html> | OpenAPI, public                  |
-| Keycloak       | <http://localhost:8180>     | admin console (`admin` / `admin` locally)    |
-| InfluxDB 3     | <http://localhost:8181>     | no auth locally                              |
-| PostgreSQL     | `localhost:5432`            | user/db `occupi` (password `occupi` locally) |
-| Frontend dev   | <http://localhost:5173>     | only when running `npm run dev` (see below)  |
-
-In the local `dev` profile the backend requires **no authentication** — every `/api`
-endpoint is open, so you can click around without logging in.
+Hardware notes (radar ports, dialout group, chirp config):
+[`raspberry/README.md`](raspberry/README.md).
 
 ## Local development from source
 
 Run individual services from source while the rest stays in Docker.
 
-**Backend from source** — start only the infrastructure, then run Spring Boot with the
-Maven wrapper:
+**Backend from source** — start only the infrastructure, then run Spring Boot with
+the Maven wrapper:
 
 ```bash
-cd docker
+cd docker/local
 docker compose up -d influxdb postgres keycloak
 
-cd ../backend
+cd ../../backend
 ./mvnw spring-boot:run
 ```
 
-The backend defaults to the `dev` profile (`application.yaml`), so no auth. It expects
-InfluxDB on `:8181` and PostgreSQL on `:5432` (the containers above). To exercise the
-authenticated code path locally, start it (or the whole stack) with `SPRING_PROFILES_ACTIVE=prod`.
+The backend defaults to the `dev` profile, so no auth. It expects InfluxDB on
+`:8181` and PostgreSQL on `:5432` (the containers above). For the authenticated
+path, start it with `SPRING_PROFILES_ACTIVE=prod`.
 
 **Frontend from source** — Vite dev server with hot reload on port 5173:
 
@@ -173,207 +152,62 @@ npm ci
 npm run dev
 ```
 
-`npm run build` produces the static bundle (`tsc -b && vite build`); `npm run preview`
-serves it. The `VITE_*` values are inlined at build time — see the
-[configuration reference](#configuration-reference).
+`npm run build` produces the static bundle; the `VITE_*` values are inlined at
+build time. The local Keycloak realm allows `:5173` as origin, so login works
+from the dev server too.
 
-**Data** — in all cases, feed the backend with the mock sender from the
-[quick start](#quick-start--local-mock-data-no-hardware), or point a real Pi at your
-machine (next section).
-
-## Data source on a Raspberry Pi / mini-PC
-
-The sender in `raspberry/` runs **on** the Pi/mini-PC as its own container, separate from
-the server stack. It reads the radar (`real`) or fakes it (`mock`) and sends to a backend
-you choose via `BACKEND_HOST`/`BACKEND_PORT`.
-
-**On the Pi, with the sensor attached** — `sensor-01` already maps the radar's two USB
-serial devices, so the mode is the only switch:
+**Data** — run the mock fleet against your locally running backend:
 
 ```bash
-cd raspberry
-cp .env.example .env      # set SENSOR_MODE=real and ROOM_ID_01 (e.g. 137)
-docker compose up -d --build
-docker compose logs -f    # expect: Frame N: Detected X people
+cd docker/local
+docker compose run --rm -e BACKEND_HOST=host.docker.internal mock
 ```
-
-**Target a backend.** The default is `localhost:8080` (plain `ws`). To send to the
-production server, which is reachable only over TLS, set in `.env`:
-
-```bash
-BACKEND_HOST=occupi.mi.hdm-stuttgart.de
-BACKEND_PORT=443
-BACKEND_TLS=true
-```
-
-The `/ws` ingestion endpoint is public (no token), and `certifi` validates the Let's
-Encrypt certificate out of the box, so the Pi can send from any internet connection — no
-HdM network or VPN needed.
-
-**Wiring the real radar.** The IWR6843 exposes two UARTs through an onboard Silicon Labs
-CP2105: `if00` is the config port (115200 baud), `if01` the data port (921600 baud). USB
-enumeration order isn't stable, so `compose.yml` maps the stable `by-id` paths on
-`sensor-01`. For a different unit, list the paths and update the two device mappings:
-
-```bash
-ls -l /dev/serial/by-id/
-```
-
-If you see no detections, the config and data ports are swapped — exchange the two
-`SERIAL_*` values on `sensor-01`. A second sensor lives behind a compose profile
-(`docker compose --profile second-sensor up -d --build`) after you give `sensor-02` its
-own devices. See `raspberry/README.md` for the full hardware notes.
-
-> **No sensor attached?** Because `sensor-01` maps USB devices, `docker compose up` won't
-> start on a machine without the radar. For hardware-free mock, use `run.sh` (as in the
-> quick start) — it doesn't need Docker or the devices.
-
-## Mock vs. real data
-
-The switch is a single environment variable **on the sender**, not on the backend:
-
-| `SENSOR_MODE` | Source                                              | Hardware |
-|---------------|-----------------------------------------------------|----------|
-| `mock` (default) | Random-walk headcount per room (`raspberry/mock_data.py`) | none |
-| `real`        | Frames from the mmWave radar over serial            | IWR6843  |
-
-Both modes send the same JSON to the backend's `/app/data` destination:
-
-```json
-{"roomId": "137", "sensorId": "sensor-01", "count": 12, "confidence": 0.93, "timestamp": "2026-06-20T10:11:12.096454+00:00"}
-```
-
-Two things are **not** the mock toggle:
-
-- **The backend has no generator.** It only ingests and stores what the sender sends.
-- **The frontend's `MOCK_ROOMS`** is a display-only fallback: if `/api/rooms` +
-  `/api/occupancy/all` return nothing or error, the dashboard shows example rooms and a
-  "mock data" banner. It never writes to the backend, and it's unrelated to `SENSOR_MODE`.
-
-For the **server demo** there is a third source: `deploy/seed-demo-data.py` rewrites
-the InfluxDB `occupancy` table with eight weeks of shaped history and one room per
-dashboard edge case (over-capacity, chart gaps, stale timestamp, night-only use, …),
-then restarts the backend. See [deploy/README.md](deploy/README.md#demo-data-seed) (#300).
 
 ## Running on the server (production)
 
-The production host (`occupi.mi.hdm-stuttgart.de`, a Debian VM) runs the same stack with
-the **prod overlay**: the backend runs the `prod` profile (Keycloak JWT required), only
-backend/frontend/Keycloak are published on `127.0.0.1` for a host Nginx that terminates
-TLS, and InfluxDB/PostgreSQL have no host ports at all. The server **pulls** prebuilt
-images from GHCR and never builds (an on-server Maven build once exhausted the swapless
-VM's RAM, see #140).
+`docker/server/` builds backend and frontend from source with the URLs from ONE
+`.env` ([ADR 0004](docs/adr/0004-server-builds-from-source.md)); every required
+value fail-fasts when missing, InfluxDB runs with token auth, and only nginx is
+public. Setup, token bootstrap and the fresh-install path:
+[`docker/server/README.md`](docker/server/README.md).
 
-First-time setup:
+Deploys are automatic: a systemd timer runs `deploy/auto-deploy.sh` every 5
+minutes — new commit on `develop` → serial build → health-gated restart →
+rollback to the last good commit on failure. Operating it, the swap-file
+prerequisite and the **migration runbook** (moving the VM from the legacy compose
+files, zero data loss): [`deploy/README.md`](deploy/README.md).
 
-```bash
-cd docker
-cp .env.example .env       # set real POSTGRES_PASSWORD, KEYCLOAK_ADMIN_PASSWORD, KC_HOSTNAME
-docker compose -f docker-compose.yml -f docker-compose.prod.yml pull
-docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
-docker compose -f docker-compose.yml -f docker-compose.prod.yml ps
-```
+## Authentication and Grafana
 
-The host Nginx (config in `deploy/nginx/occupi.conf`) terminates TLS and routes:
-`/` → frontend `:3000`, `/api/` and `/ws` → backend `:8080`, `/auth` → Keycloak `:8180`.
-
-**Automatic deploys.** A systemd timer (`deploy/occupi-autodeploy.timer`, every ~5 min)
-runs `deploy/auto-deploy.sh`: it fast-forwards `develop`, pulls the latest backend/frontend
-images, recreates only the services whose image changed, health-checks each with rollback
-on failure, and prunes old images. It deliberately **does not touch** infrastructure
-(InfluxDB, PostgreSQL, Keycloak) — those are pinned and updated by hand. See `deploy/README.md`.
-
-Because auto-deploy skips infra, changes to the InfluxDB container (e.g. its resource cap
-in the prod overlay) need a one-off manual apply:
-
-```bash
-cd docker
-docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d influxdb
-```
-
-## Web UI, authentication, and Grafana
-
-**Dashboard.** Local: <http://localhost:3000>. Production: `https://occupi.mi.hdm-stuttgart.de`.
-
-**Authentication.**
-
-- **Local (`dev` profile):** no login — the API is open.
-- **Production (`prod` profile):** every `/api` request needs a valid Keycloak JWT. Login
-  goes through the `occupi` realm (client `occupi-frontend`); users authenticate with
-  their **HdM LDAP** username and password. Self-registration is disabled and no test
-  users are seeded — end users come from LDAP. Room mutations (`POST`/`PUT`/`DELETE
-  /api/rooms`) and all `/api/metrics` endpoints require the realm role `admin`, which an
-  operator assigns in the Keycloak admin console after a user has logged in once.
-- The Keycloak **admin console** is at `:8180` locally (`admin` / `admin`) and under
-  `/auth` in production (credentials from `docker/.env`).
-
-**Grafana (optional).** A standalone stack in `frontend/grafana/compose.yml` reads InfluxDB
-directly over FlightSQL for ad-hoc dashboards. It is not part of the main stack and is not
-auto-deployed. It needs the external `mmwave-net` network and InfluxDB attached to it:
-
-```bash
-docker network create mmwave-net                          # one-time, if it doesn't exist
-docker compose -f frontend/grafana/compose.yml up -d      # Grafana on :3000 (admin/admin)
-```
-
-> Grafana publishes host port **3000**, which collides with the frontend's `3000`. Run it
-> on a separate host, or change one of the ports. The FlightSQL → InfluxDB datasource is
-> **not** provisioned in the repo — add it in the Grafana UI. See [Known gaps](#known-gaps--todo).
+- **Local:** the stack runs open (dev profile) by default. Flip
+  `SPRING_PROFILES_ACTIVE=prod` in `docker/local/.env` for the real flow — the
+  local realm seeds `occupi-admin`/`occupi-admin` and `occupi-user`/`occupi-user`,
+  and inside the HdM network (or VPN) HdM accounts work too (LDAP federation).
+- **Server:** accounts come from HdM LDAP (username, not email);
+  self-registration is off. Admin-only actions need the `admin` realm role,
+  assigned in the Keycloak console.
+- **Grafana:** provisioned in both stacks (FlightSQL datasource + the room
+  dashboard with its `$room` variable). Local: http://localhost:3001
+  (admin/admin). Server: 127.0.0.1:3001 via SSH tunnel.
 
 ## Configuration reference
 
-Only the values you'll actually touch. Internal service-to-service URLs
-(`INFLUXDB_URL`, `POSTGRES_URL`, `KEYCLOAK_JWK_SET_URI`) are hard-wired in
-`docker/docker-compose.yml` and normally need no change.
+Only the values you'll actually touch — each stack documents its own file:
 
-**Server secrets — `docker/.env`** (copy from `docker/.env.example`, git-ignored):
+| Where | File | You touch |
+|---|---|---|
+| Local stack | `docker/local/.env` (committed) | `MOCK_ROOMS`; optional: `SPRING_PROFILES_ACTIVE=prod`, intervals, credentials |
+| Server stack | `docker/server/.env` (from `.env.example`, git-ignored) | everything — every variable is required and commented |
+| Real Pi | `raspberry/docker/.env` (from `.env.example`, git-ignored) | `ROOM_ID`, `SENSOR_ID`, `RADAR_SERIAL`, `BACKEND_*` |
+| Frontend dev | `frontend/.env` (from `.env.example`) | `VITE_*` for `npm run dev` |
 
-| Variable                  | Purpose                                   | Example                          |
-|---------------------------|-------------------------------------------|----------------------------------|
-| `POSTGRES_USER`           | Postgres user (occupi + keycloak DBs)     | `occupi`                         |
-| `POSTGRES_PASSWORD`       | Postgres password                         | *(set a real secret)*            |
-| `KEYCLOAK_ADMIN`          | Keycloak bootstrap admin user             | `admin`                          |
-| `KEYCLOAK_ADMIN_PASSWORD` | Keycloak bootstrap admin password         | *(set a real secret)*            |
-| `KC_HOSTNAME`             | Public HTTPS host (required in prod)      | `occupi.mi.hdm-stuttgart.de`     |
-
-**Backend** (`backend/src/main/resources/application.yaml`; overridable via env):
-
-| Variable                       | Default                     | Purpose                                          |
-|--------------------------------|-----------------------------|--------------------------------------------------|
-| `SPRING_PROFILES_ACTIVE`       | `dev`                       | `dev` = open, no auth; `prod` = Keycloak JWT      |
-| `INFLUXDB_URL`                 | `http://localhost:8181`     | InfluxDB endpoint (compose sets `http://influxdb:8181`) |
-| `POSTGRES_URL`                 | `jdbc:postgresql://localhost:5432/occupi` | room-metadata DB                   |
-| `occupancy.latest-lookback-days` | `7`                       | TTL of the InfluxDB last value cache serving "latest per room" |
-| `occupancy.latest-fallback-days` | `2`                       | bounded-scan window that tops up the cache after an InfluxDB restart |
-| `chart.history.max-hours` / `forecast.max-hours` | `168`     | hard cap on the history/forecast request window  |
-| `chart.weekpattern.max-weeks`  | `8`                         | hard cap on the week-pattern request window       |
-
-**Sensor sender** (`raspberry/.env`, copy from `raspberry/.env.example`):
-
-| Variable            | Default      | Purpose                                                     |
-|---------------------|--------------|-------------------------------------------------------------|
-| `SENSOR_MODE`       | `mock`       | `mock` or `real`                                            |
-| `BACKEND_HOST`      | `localhost`  | backend host for the STOMP/WebSocket connection             |
-| `BACKEND_PORT`      | `8080`       | backend port (`443` for the TLS production endpoint)        |
-| `BACKEND_TLS`       | `false`      | `true` = connect over `wss` (required for production)       |
-| `ROOM_ID_01`        | `room-01`    | room this sensor reports (e.g. `137`)                       |
-| `MOCK_ROOM_IDS`     | *(empty)*    | comma-separated rooms to simulate from one mock process     |
-| `MOCK_INTERVAL`     | `2.0`        | seconds between mock readings (raise it for many rooms)     |
-
-> `run.sh` does **not** read `.env` — pass its variables inline, e.g.
-> `SENSOR_MODE=mock BACKEND_HOST=localhost ./run.sh`.
-
-**Frontend** (`frontend/.env`, build-time — Vite inlines them, so rebuild after changing):
-
-| Variable                  | Default (local)             | Purpose                        |
-|---------------------------|-----------------------------|--------------------------------|
-| `VITE_API_URL`            | `http://localhost:8080/api` | backend API base URL           |
-| `VITE_KEYCLOAK_URL`       | `http://localhost:8180`     | Keycloak base URL              |
-| `VITE_KEYCLOAK_REALM`     | `occupi`                    | Keycloak realm                 |
-| `VITE_KEYCLOAK_CLIENT_ID` | `occupi-frontend`           | Keycloak client                |
-
-The production frontend image bakes the public URLs in at build time via Compose build
-args; the local override sets the `localhost` values above.
+Backend knobs beyond that (all env-overridable with local defaults,
+[ADR 0001](docs/adr/0001-configuration-via-environment-variables.md)):
+`INFLUXDB_URL/DATABASE/TOKEN`, `CORS_ALLOWED_ORIGINS` (one list for HTTP and
+WebSocket), `OCCUPI_SEED_ROOMS` (room seed, unset on servers),
+`OCCUPI_SENSOR_AUTOREGISTER_CAP` (registry auto-register cap, default 100),
+`occupancy.latest-lookback-days`/`latest-fallback-days` and the chart cache TTLs
+in `application.yaml`.
 
 ### REST API (under `/api`)
 
@@ -384,57 +218,52 @@ args; the local override sets the `localhost` values above.
 | GET    | `/occupancy/history?roomId={id}&hours=24`    | any authenticated  |
 | GET    | `/occupancy/weekpattern?roomId={id}&weeks=8` | any authenticated  |
 | GET    | `/forecast?roomId={id}&forecastHours=2`      | any authenticated  |
-| GET    | `/rooms`, `/rooms/{id}`                       | any authenticated  |
+| GET    | `/rooms`, `/rooms/{id}`                      | any authenticated  |
 | POST / PUT / DELETE | `/rooms`, `/rooms/{id}`         | `admin` role       |
+| GET    | `/sensors`                                   | any authenticated  |
+| PUT    | `/sensors/{id}`, `/sensors/{id}/assignment`  | `admin` role       |
+| DELETE | `/sensors/{id}`, `/sensors/{id}/assignment`  | `admin` role       |
 | GET    | `/metrics`, `/metrics/{sensorId}`            | `admin` role       |
 | GET    | `/auth/userinfo`                             | valid JWT          |
 
-In the `dev` profile all of the above are open. WebSocket ingestion is at `/ws` (raw, used
-by the Pi) and `/ws/occupancy` (SockJS, used by the browser); senders publish to `/app/data`
-and `/app/metrics`, and the browser subscribes to `/topic/occupancy`.
+In the `dev` profile all of the above are open. WebSocket ingestion is at `/ws`
+(raw, used by the Pi) and `/ws/occupancy` (SockJS, used by the browser); senders
+publish to `/app/data` and `/app/metrics`, the browser subscribes to
+`/topic/occupancy`.
 
 ## Troubleshooting
 
-- **Dashboard shows a "mock data" banner / example rooms.** The frontend fell back to
-  `MOCK_ROOMS` because `/api/rooms` + `/api/occupancy/all` returned nothing or errored.
-  Check the backend is up (`http://localhost:8080/api/rooms`) and that a sender is running.
-  A fresh InfluxDB has no `occupancy` table until the first reading arrives.
-
-- **Mock sender in Docker won't start on my laptop.** Expected — `sensor-01` maps the
-  radar's USB devices. Use the hardware-free `run.sh` path instead.
-
-- **Sender can't reach the backend from a container on the same host.** Inside a container,
-  `localhost` is the container itself, not your host. For local mock use `run.sh` (runs on
-  the host). For a Pi, set `BACKEND_HOST` to the backend's actual address.
-
-- **`docker compose up` (prod) fails on `KC_HOSTNAME`.** The prod overlay requires it —
-  set `KC_HOSTNAME` in `docker/.env`.
-
-- **Can't log in in production.** Accounts come from HdM LDAP (username, not email);
-  self-registration is off. Admin-only actions need the `admin` realm role assigned in
-  Keycloak.
-
-- **Grafana shows no data.** Create the `mmwave-net` network, attach InfluxDB to it, and
-  add the FlightSQL datasource in the Grafana UI (none is provisioned in the repo). Also
-  check the `:3000` port collision with the frontend.
-
+- **Dashboard shows a "mock data" banner / example rooms.** The frontend fell back
+  because `/api/rooms` + `/api/occupancy/all` returned nothing or errored. In the
+  local stack that points at the backend or mock container:
+  `docker compose ps` / `docker compose logs backend mock`.
+- **A room stays empty although its Pi is sending.** Open the admin panel's sensor
+  section (or `GET /api/sensors`): a device with status "ungeklärt" claims a room
+  id that doesn't exist — fix the Pi's `ROOM_ID` or assign a room right there.
+- **Sender can't reach the backend from a container on the same host.** Inside a
+  container, `localhost` is the container itself. Use `host.docker.internal`
+  (mock against a source-run backend) or the real address (Pi).
+- **`docker compose config` fails in `docker/server/`.** Intended: the message
+  names the missing required variable — fill it in `.env`.
+- **Can't log in in production.** Accounts come from HdM LDAP (username, not
+  email); admin actions need the `admin` realm role from the Keycloak console.
 - **InfluxDB pins the CPU / server becomes unresponsive.** Keep occupancy queries
-  time-bounded and make sure the InfluxDB container resource cap from the prod overlay is
-  applied (`docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d influxdb`);
-  auto-deploy does not apply it. Background: #273.
+  time-bounded; the server compose carries the container resource cap, but
+  auto-deploy never recreates infra — apply it once manually
+  (`docker compose up -d influxdb` in `docker/server/`). Background: #273.
 
 ## Known gaps / TODO
 
 These are real, current limitations — not aspirational features.
 
-- **No backend-side mock generator.** Mock data only exists via the Pi sender in mock mode
-  (`raspberry/run.sh`); it is not wired into `docker compose up`, so first-time users must
-  start it separately.
-- **Grafana is not turnkey.** The external `mmwave-net` network is not created by any
-  compose file, no datasource is provisioned in the repo, and its host port `3000` collides
-  with the frontend.
-- **InfluxDB runs without authentication** (`--without-auth`, no token). In production it's
-  only network-isolated (no host port). Enabling token auth is a follow-up.
-- **Schema management** uses JPA `ddl-auto=update`; there is no migration tool (Flyway) yet.
-- **InfluxDB prod resource limits** are applied only by a manual `up -d influxdb`, because
-  auto-deploy never recreates infrastructure.
+- **WebSocket ingestion is unauthenticated** (`/ws` is public even in prod).
+  Mitigated by ingest-id validation and the registry's auto-register cap;
+  per-device credentials are #322.
+- **Schema management** uses JPA `ddl-auto=update`; there is no migration tool
+  (Flyway) yet.
+- **Historical points are never re-tagged.** Reassigning a sensor applies from
+  that moment on — whatever a wrongly-claimed device wrote before the correction
+  stays under the old room id (InfluxDB 3 cannot rewrite tags).
+- **Infra updates are manual by design** (auto-deploy only touches backend and
+  frontend): InfluxDB/Postgres/Keycloak version bumps and the InfluxDB resource
+  cap need a manual `docker compose up -d <service>`.
