@@ -2,6 +2,8 @@ package com.occupi.feature.room;
 
 import com.occupi.feature.room.dto.RoomRequest;
 import com.occupi.feature.room.dto.RoomResponse;
+import com.occupi.feature.sensor.Sensor;
+import com.occupi.feature.sensor.SensorRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -22,6 +24,9 @@ class RoomServiceImplTest {
 
     @Mock
     private RoomRepository roomRepository;
+
+    @Mock
+    private SensorRepository sensorRepository;
 
     @InjectMocks
     private RoomServiceImpl service;
@@ -120,6 +125,21 @@ class RoomServiceImplTest {
         service.deleteRoom("room-1");
 
         verify(roomRepository).deleteById("room-1");
+    }
+
+    @Test
+    @DisplayName("deleteRoom is blocked with 409 while sensors are assigned to the room")
+    void deleteRoom_withAssignedSensors_throwsConflict() {
+        when(roomRepository.existsById("room-1")).thenReturn(true);
+        when(sensorRepository.findByOverrideRoomId("room-1")).thenReturn(List.of(
+                Sensor.builder().sensorId("pi-a").build(),
+                Sensor.builder().sensorId("pi-b").build()));
+
+        assertThatThrownBy(() -> service.deleteRoom("room-1"))
+                .isInstanceOf(RoomHasAssignedSensorsException.class)
+                .hasMessageContaining("pi-a")
+                .hasMessageContaining("pi-b");
+        verify(roomRepository, never()).deleteById(anyString());
     }
 
     @Test
