@@ -1,0 +1,79 @@
+{
+  "uid": "occupi-occupancy",
+  "title": "OccuPi — Raumbelegung",
+  "tags": ["occupi"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "refresh": "30s",
+  "time": { "from": "now-6h", "to": "now" },
+  "templating": {
+    "list": [
+      {
+        "name": "room",
+        "label": "Raum",
+        "type": "query",
+        "datasource": { "type": "influxdata-flightsql-datasource", "uid": "occupi-influxdb" },
+        "query": "SELECT DISTINCT \"roomId\" FROM occupancy",
+        "refresh": 2,
+        "multi": true,
+        "includeAll": true,
+        "current": { "selected": true, "text": ["All"], "value": ["$__all"] }
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "timeseries",
+      "title": "Belegung im Zeitverlauf",
+      "gridPos": { "h": 12, "w": 16, "x": 0, "y": 0 },
+      "datasource": { "type": "influxdata-flightsql-datasource", "uid": "occupi-influxdb" },
+      "fieldConfig": {
+        "defaults": {
+          "custom": { "drawStyle": "line", "lineWidth": 2, "fillOpacity": 8, "spanNulls": true },
+          "unit": "none",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawEditor": true,
+          "queryText": "SELECT time, \"count\", \"roomId\" FROM occupancy WHERE \"roomId\" IN (${room:sqlstring}) AND $__timeRangeFilter(time) ORDER BY time"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "partitionByValues",
+          "options": { "fields": ["roomId"] }
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Aktuelle Belegung",
+      "gridPos": { "h": 12, "w": 8, "x": 16, "y": 0 },
+      "datasource": { "type": "influxdata-flightsql-datasource", "uid": "occupi-influxdb" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "color": { "mode": "palette-classic" }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"], "values": false },
+        "textMode": "value_and_name"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawEditor": true,
+          "queryText": "SELECT \"roomId\", MAX_BY(\"count\", time) AS \"count\" FROM occupancy WHERE \"roomId\" IN (${room:sqlstring}) AND time >= now() - INTERVAL '1 hour' GROUP BY \"roomId\" ORDER BY \"roomId\""
+        }
+      ]
+    }
+  ]
+}
