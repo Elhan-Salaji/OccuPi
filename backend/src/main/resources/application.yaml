@@ -28,6 +28,14 @@ influxdb:
   database: ${INFLUXDB_DATABASE:occupi}
   token: ${INFLUXDB_TOKEN:}
 
+# Origin patterns for browser access, consumed by both the HTTP CORS configuration
+# and the WebSocket handshake (CorsProperties). The default allows any localhost
+# port plus the production domain; deployments under another hostname override via
+# CORS_ALLOWED_ORIGINS (comma-separated).
+occupi:
+  cors:
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:*,https://occupi.mi.hdm-stuttgart.de}
+
 # "Latest per room / per sensor" reads are the union of InfluxDB's in-memory last
 # value cache (#294) — latest-lookback-days is that cache's TTL — and a scan
 # bounded to latest-fallback-days, which restores rooms the cache lost across an
