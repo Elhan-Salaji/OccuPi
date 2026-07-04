@@ -91,6 +91,16 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   live occupancy for room 137 (#201).
 
 ### Changed
+- Auto-deploy builds from source now: the systemd timer stays exactly as it is
+  (5-minute tick, same units), but `deploy/auto-deploy.sh` triggers on new commits
+  on `origin/develop` instead of moved GHCR digests, builds backend and frontend
+  serially against `docker/server/compose.yml`, health-gates both, and rolls back
+  by resetting to the last good commit and rebuilding (minutes, not seconds — the
+  accepted cost for images that no longer depend on a registry or a baked-in
+  hostname). A swap file is now a documented prerequisite: an unswapped on-server
+  build killed the VM once (#140). The full VM cutover — volume adoption, Influx
+  token bootstrap, timer conversion table, rollback — lives as a runbook in
+  `deploy/README.md` (#315).
 - The backend's InfluxDB connection (`INFLUXDB_URL`/`INFLUXDB_DATABASE`/`INFLUXDB_TOKEN`)
   and the CORS origins (`CORS_ALLOWED_ORIGINS`, comma-separated patterns) are now plain
   environment variables with the previous values as local defaults. The origin list is
