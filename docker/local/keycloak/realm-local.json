@@ -4,7 +4,7 @@
   "registrationAllowed": false,
   "loginWithEmailAllowed": false,
   "duplicateEmailsAllowed": true,
-  "sslRequired": "external",
+  "sslRequired": "none",
   "roles": {
     "realm": [
       {

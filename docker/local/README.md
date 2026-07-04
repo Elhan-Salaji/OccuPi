@@ -62,6 +62,11 @@ Standardmäßig läuft das Backend im offenen dev-Profil. Voller Login-Flow:
    VPN funktioniert zusätzlich der Login mit dem echten HdM-Account
    (LDAP-Federation, read-only).
 
+Der lokale Realm läuft mit `sslRequired: none`: Der Stack spricht bewusst
+überall plain HTTP auf localhost — TLS ist im Serverbetrieb Sache von nginx.
+Mit `external` (dem Server-Wert) antwortet Keycloak sonst mit „HTTPS required",
+sobald eine Anfrage nicht von einer als lokal geltenden Adresse kommt.
+
 **Realm-Änderungen:** `--import-realm` importiert `keycloak/realm-local.json`
 nur in eine leere Keycloak-Datenbank. Nach einer Änderung an der Datei:
 `docker compose down -v && docker compose up -d --build`.
