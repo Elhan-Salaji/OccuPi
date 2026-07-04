@@ -1,34 +1,14 @@
 import os
 
-# --- Sensor Identity ---
-ROOM_ID   = os.getenv("ROOM_ID",   "room-01")
-SENSOR_ID = os.getenv("SENSOR_ID", "sensor-01")
+# --- Sensor Identity (both REQUIRED — see validate()) ---
+# ROOM_ID must match a room in the admin panel; it is the claim the backend's
+# sensor registry resolves. SENSOR_ID is the stable device name the admin panel
+# addresses this Pi by (e.g. "pi-bibliothek"). The old silent defaults
+# ("room-01"/"sensor-01") produced phantom rooms on typos — hence fail-fast.
+ROOM_ID   = os.getenv("ROOM_ID")
+SENSOR_ID = os.getenv("SENSOR_ID")
 
-# --- Sensor Mode ---
-# "mock" generates realistic fake occupancy data (no hardware needed), used by the
-# container and for local testing. "real" reads from the mmWave sensor over serial.
-# "demo" runs the scripted dashboard demo (see demo_data.py).
-# Flip this in one place: the SENSOR_MODE entry of your .env file.
-SENSOR_MODE = os.getenv("SENSOR_MODE", "mock").strip().lower()
-
-# --- Mock Generator (only used when SENSOR_MODE=mock) ---
-MOCK_INTERVAL      = float(os.getenv("MOCK_INTERVAL",      "2.0"))  # seconds between fake readings
-MOCK_ROOM_CAPACITY = int(os.getenv("MOCK_ROOM_CAPACITY",   "30"))   # max plausible headcount for the room
-MOCK_MAX_STEP      = int(os.getenv("MOCK_MAX_STEP",        "2"))    # max headcount change per reading
-# Comma-separated room IDs to simulate from this single container (e.g. "006,011,137").
-# Empty = just ROOM_ID. Lets one mock container fill many rooms at once (no hardware).
-MOCK_ROOM_IDS      = [r.strip() for r in os.getenv("MOCK_ROOM_IDS", "").split(",") if r.strip()]
-
-# --- Demo Scenario (only used when SENSOR_MODE=demo) ---
-# Rooms the demo drives, as comma-separated roomId:capacity pairs. The capacity
-# must match the room's capacity in Postgres — the frontend computes the traffic
-# light from count / capacity(Postgres), so a mismatch shifts every band.
-DEMO_ROOMS            = os.getenv("DEMO_ROOMS", "016E:50,136:20,011:250")
-DEMO_INTERVAL         = float(os.getenv("DEMO_INTERVAL", "15"))  # seconds between readings per room (keep within 10-30)
-DEMO_MAX_STEP         = int(os.getenv("DEMO_MAX_STEP", "3"))     # max headcount change per reading (small steps)
-DEMO_METRICS_INTERVAL = float(os.getenv("DEMO_METRICS_INTERVAL", "45"))  # seconds between health snapshots (keep within 30-60)
-
-# --- Serial ---
+# --- Serial (TI IWR6843 via CP2105 dual UART) ---
 SERIAL_CFG_PORT  = os.getenv("SERIAL_CFG_PORT",  "/dev/ttyUSB0")
 SERIAL_DATA_PORT = os.getenv("SERIAL_DATA_PORT", "/dev/ttyUSB1")
 SERIAL_CFG_BAUD  = 115200
@@ -51,7 +31,6 @@ BACKEND_TLS_CA      = os.getenv("BACKEND_TLS_CA", "").strip()
 
 # --- Queue & Processing ---
 QUEUE_MAX_SIZE      = int(os.getenv("QUEUE_MAX_SIZE",      "100"))
-PROCESSING_INTERVAL = float(os.getenv("PROCESSING_INTERVAL", "0.1"))  # seconds (= 10fps)
 METRICS_INTERVAL = float(os.getenv("METRICS_INTERVAL", "10")) # seconds between metric log lines
 
 # --- WebSocket Reconnect ---
@@ -59,10 +38,9 @@ WS_RECONNECT_DELAY = int(os.getenv("WS_RECONNECT_DELAY", "5"))  # seconds until 
 WS_MAX_RETRIES     = int(os.getenv("WS_MAX_RETRIES", "0"))  # 0 = infinite retries
 
 # --- Visualizer ---
-# Live matplotlib view of the point cloud and tracked targets. Only used in real
-# (sensor) mode; mock mode never opens it. Off by default so the headless/
-# containerised sensor isn't affected — run with USE_VISUALIZER=true on a Pi or
-# desktop that has a display.
+# Live matplotlib view of the point cloud and tracked targets. Off by default so
+# the headless/containerised sensor isn't affected — run with USE_VISUALIZER=true
+# on a Pi or desktop that has a display.
 USE_VISUALIZER     = os.getenv("USE_VISUALIZER", "false").strip().lower() in ("1", "true", "yes")
 # Cap redraws so rendering never starves the serial read loop (sensor sends ~18fps).
 VISUALIZER_MAX_FPS = float(os.getenv("VISUALIZER_MAX_FPS", "10"))
@@ -73,3 +51,18 @@ BOUNDARY_X_MIN = -4
 BOUNDARY_X_MAX = 4
 BOUNDARY_Y_MIN = -4
 BOUNDARY_Y_MAX = 4
+
+
+def validate() -> None:
+    """Fails fast when the device identity is incomplete.
+
+    Called by main.py before anything connects: a Pi without ROOM_ID/SENSOR_ID
+    must refuse to start instead of feeding data under a silent default id.
+    """
+    missing = [name for name, value in (("ROOM_ID", ROOM_ID), ("SENSOR_ID", SENSOR_ID)) if not value]
+    if missing:
+        raise SystemExit(
+            "Missing required environment: " + ", ".join(missing)
+            + " — set them in raspberry/docker/.env (ROOM_ID must match a room "
+            + "in the admin panel, SENSOR_ID is this Pi's stable device name)"
+        )

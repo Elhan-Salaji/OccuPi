@@ -22,7 +22,10 @@ brachte nur graduelle Besserung. Das Grundproblem blieb: laterale Bewegung ist a
 radial unsichtbar.
 
 **Entscheidung.** Umstieg auf **Overhead-/Deckenmontage** mit der **Overhead 3D People
-Tracking**-Firmware + zugehörigem Config (`pt_6843_3d_aop_overhead_3m_radial_staticRetention.cfg`).
+Tracking**-Firmware + zugehörigem Config. Geladen wird `aop_overhead_3m_radial.cfg`
+(`receiver.py:CONFIG_FILE`); die Variante mit Static-Retention
+(`pt_6843_3d_aop_overhead_3m_radial_staticRetention.cfg`) liegt daneben in
+`chirp_configs/` und stand hier früher fälschlich als aktive Datei.
 
 **Warum das funktioniert.** Senkrecht von oben sind Personen gut separierbare „Blobs", und keine
 radiale Achse zeichnet sich aus, auf der laterale Bewegung verschwände. Jede Geh-Richtung zählt
