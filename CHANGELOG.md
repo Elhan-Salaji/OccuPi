@@ -8,6 +8,19 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 ### Added
+- `docker/local/`: the complete stack in one command. `cd docker/local && docker
+  compose up -d --build` starts backend + frontend (built from source with
+  localhost URLs), Postgres, Keycloak (imports a localhost realm with seeded test
+  users `occupi-admin`/`occupi-user` AND the HdM LDAP federation, so HdM logins work
+  locally inside the HdM network), InfluxDB 3, Grafana on :3001 (FlightSQL
+  datasource + room dashboard provisioned, `$room` variable) and a mock fleet that
+  simulates one Pi per `MOCK_ROOMS` entry — each with its own `sensorId` and
+  capacity, fixing the old mock's shared-identity bug. The same `MOCK_ROOMS` value
+  seeds the rooms into Postgres at startup: a fresh clone shows live per-room data
+  without a single click. The committed `.env` holds the one value to touch
+  (`MOCK_ROOMS`) plus commented defaults; the auth flow is one uncommented variable
+  away (`SPRING_PROFILES_ACTIVE=prod`). The legacy `docker/` compose files stay
+  untouched until the server has moved (#313).
 - Sensor admin API for the panel's correction path: `GET /api/sensors` lists every
   device with claim, effective room, derived status (claimed / overridden /
   unresolved), last seen and dropped-point counters; `PUT /api/sensors/{id}/assignment`
