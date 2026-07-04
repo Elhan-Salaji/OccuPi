@@ -162,13 +162,12 @@ class SensorRegistryServiceImplTest {
     }
 
     @Test
-    @DisplayName("room created later: after invalidateAll the pending claim resolves")
-    void roomCreatedLaterResolvesAfterInvalidation() {
+    @DisplayName("room created later: the very next message resolves — unresolved is never cached")
+    void roomCreatedLaterResolvesOnNextMessage() {
         when(sensorRepository.findById("pi-1")).thenReturn(Optional.of(knownSensor("pi-1", "006")));
         when(roomRepository.existsById("006")).thenReturn(false).thenReturn(true);
 
         assertThat(registry.resolveEffectiveRoom("pi-1", "006")).isEmpty();
-        registry.invalidateAll();
         assertThat(registry.resolveEffectiveRoom("pi-1", "006")).contains("006");
     }
 
