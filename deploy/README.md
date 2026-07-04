@@ -1,13 +1,15 @@
 # OccuPi — deploy
 
 Host-side bits that live outside Docker Compose: the Nginx reverse proxy
-([`nginx/occupi.conf`](nginx/occupi.conf)) and the **automatic deploy** timer.
+([`nginx/occupi.conf`](nginx/occupi.conf)), the **automatic deploy** timer and the
+**migration runbook** for moving the VM onto `docker/server/`.
 
 ## Automatic deploy (systemd timer)
 
-The server only ever **pulls** prebuilt images from GHCR and never builds (an
-on-server Maven build once exhausted the swapless VM's RAM, see #140). This timer
-automates the manual `pull` + recreate you would otherwise SSH in to run.
+The server builds backend and frontend **from source** on every new commit to
+`develop` (decision recorded in the ADRs; the GHCR-pull flow this replaced is
+described at the end of this section). The timer automates the manual
+pull + build + recreate you would otherwise SSH in to run.
 
 ```
 auto-deploy.sh              # the deploy logic (versioned here, runs from the repo)
@@ -15,82 +17,95 @@ occupi-autodeploy.service   # one-shot unit that runs the script
 occupi-autodeploy.timer     # fires the service every 5 minutes
 ```
 
+> **Prerequisite: a swap file.** An on-server build once exhausted the swapless
+> VM's RAM and took the box down (#140). Before the first build-based deploy:
+>
+> ```bash
+> fallocate -l 2G /swapfile && chmod 600 /swapfile
+> mkswap /swapfile && swapon /swapfile
+> echo '/swapfile none swap sw 0 0' >> /etc/fstab   # survive reboots
+> ```
+
 ### What a run does
 
-1. **Fast-forwards the repo** (`git pull --ff-only` on `develop`) so compose files
-   and this script stay current. Diverged/blocked checkout → it warns and skips
-   the update instead of forcing anything.
-2. **Pulls** the latest `backend` + `frontend` images from GHCR (download only —
-   running containers are not touched yet).
-3. **Recreates only what changed.** A service is restarted only if its `:latest`
-   image id differs from the one its container is running. Infra
-   (`postgres` / `keycloak` / `influxdb`) is deliberately left alone.
-4. **Health-gates each update with rollback.** After recreating a service it polls
-   a liveness URL (`backend` → `/v3/api-docs`, `frontend` → `/`). If it does not
-   return `200` within ~2 min, it **rolls back** to the previous image, records the
-   bad image digest, and that digest is **not redeployed** until `:latest` moves on.
-5. **Prunes** dangling and >14-day-old unused images to reclaim disk.
+1. **Fetches** `origin/develop` and compares commits. Nothing new and both
+   services running → the run ends right there (cheap no-op every 5 minutes).
+2. **Fast-forwards the repo** — compose files, sources and the script itself.
+   A diverged checkout makes it skip the run instead of forcing anything.
+3. **Builds from source, one service at a time** (`docker compose build backend`,
+   then `frontend`) — serial on purpose, the single-core host must never run two
+   builds at once.
+4. **Recreates and health-gates** each service (`backend` → `/v3/api-docs`,
+   `frontend` → `/`; up to ~2 min each). On failure it **rolls back**: reset to
+   the last good commit, rebuild, and the bad commit is recorded so it is not
+   retried until `develop` moves past it.
+5. **Prunes** dangling and >14-day-old unused images — source builds leave
+   layers behind on every run.
 
-It is safe to run on every tick: when nothing changed it is a no-op. Only one run
-executes at a time (flock).
+Infra (postgres / keycloak / influxdb / grafana) is deliberately never touched:
+pinned versions, updated manually. Only one run executes at a time (flock).
 
-> **Note:** auto-deploy means *every merge to `develop` goes live by itself*
-> within ~5–10 min (CI build + next tick). That is the intended behaviour.
+> **Note:** auto-deploy still means *every merge to `develop` goes live by
+> itself* — now within ~5–10 min including the build instead of a registry pull.
+> Rollback is a rebuild and takes minutes, not seconds; that is the accepted
+> cost of images that no longer depend on a registry or a baked-in hostname.
+
+### Was sich am Timer geändert hat (GHCR-Pull → Build)
+
+Der 5-Minuten-Mechanismus ist ein systemd-**Timer**, kein Crontab:
+`occupi-autodeploy.timer` startet alle 5 Minuten `occupi-autodeploy.service`,
+und der führt `deploy/auto-deploy.sh` aus. **An den beiden Unit-Dateien ändert
+sich nichts** — gleicher Timer, gleicher Rhythmus, gleiche Befehle
+(`systemctl`/`journalctl` wie gehabt). Nur die Logik im Skript ist neu:
+
+| | vorher (GHCR-Pull) | jetzt (Build from source) |
+|---|---|---|
+| Auslöser | `:latest`-Image-Digest hat sich bewegt | neuer Commit auf `origin/develop` |
+| Beschaffung | `docker compose pull` aus GHCR | `docker compose build` aus dem Repo |
+| Compose-Dateien | `docker/docker-compose.yml` + `prod`-Overlay | `docker/server/compose.yml` |
+| Rollback | vorheriges Image re-taggen (Sekunden) | Reset auf letzten guten Commit + Rebuild (Minuten) |
+| Merker für „kaputt" | Bad-Digest-Datei | Bad-Commit-Datei |
+
+Da das Skript direkt aus dem Repo läuft, aktiviert sich die neue Logik von
+selbst mit dem `git pull` des Cutovers — die Units müssen nicht neu kopiert
+werden.
 
 ### Install (one-time, on the server, as root)
 
-After this is merged to `develop` and the repo is pulled on the server:
-
 ```bash
 cd /home/Elhan/Occupi
-git pull --ff-only                      # get the deploy/ files
+git pull --ff-only
 
-# Copy the units into systemd (cp, not symlink — most reliable for enable):
 cp deploy/occupi-autodeploy.service deploy/occupi-autodeploy.timer /etc/systemd/system/
-
 systemctl daemon-reload
 systemctl enable --now occupi-autodeploy.timer
 
-# Optional: run it once now and watch it
-systemctl start occupi-autodeploy.service
+systemctl start occupi-autodeploy.service   # optional: run once now
 journalctl -u occupi-autodeploy -f
 ```
-
-The **script** (`auto-deploy.sh`) runs straight from the repo, so it stays current
-via `git pull` automatically. Only the two **unit files** are copied — re-`cp` them
-+ `systemctl daemon-reload` on the rare occasion they change.
 
 ### Operate
 
 ```bash
 systemctl list-timers occupi-autodeploy.timer     # when does it next run?
 journalctl -u occupi-autodeploy -n 100 --no-pager # recent deploy logs
-systemctl start occupi-autodeploy.service         # deploy now (don't wait for the tick)
+systemctl start occupi-autodeploy.service         # deploy now (don't wait)
 
-# Pause / resume automatic deploys:
-systemctl stop occupi-autodeploy.timer            # pause
+systemctl stop occupi-autodeploy.timer            # pause automatic deploys
 systemctl start occupi-autodeploy.timer           # resume
 ```
 
-A failed deploy makes the **service** unit fail (visible in
-`systemctl status occupi-autodeploy.service` and `journalctl`). The site stays up
-because the script rolls back.
-
-### Change the deploy logic later
-
-`auto-deploy.sh` runs straight from the repo, so editing it via Git (push to
-`develop`) takes effect on the next tick — **no server access needed**. Only
-changing the schedule in `occupi-autodeploy.timer` needs a server-side re-`cp`
-+ `systemctl daemon-reload`.
+A failed deploy makes the service unit fail (visible in `systemctl status` /
+`journalctl`); the site stays up because the script rolls back to the last good
+commit. On non-standard hosts, `REPO_DIR` and `BRANCH` are env-overridable.
 
 ### Manual deploy (no timer)
 
-The timer just automates this; you can always do it by hand:
-
 ```bash
-cd /home/Elhan/Occupi/docker
-docker compose -f docker-compose.yml -f docker-compose.prod.yml pull
-docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+cd /home/Elhan/Occupi && git pull --ff-only
+cd docker/server
+docker compose build backend && docker compose build frontend
+docker compose up -d
 ```
 
 ### Uninstall
@@ -100,6 +115,94 @@ systemctl disable --now occupi-autodeploy.timer
 rm -f /etc/systemd/system/occupi-autodeploy.{service,timer}
 systemctl daemon-reload
 ```
+
+## Migrations-Runbook: VM auf docker/server umziehen
+
+Einmaliger Cutover von der alten Struktur (base + prod-Overlay, GHCR-Images) auf
+`docker/server/`. Kernpunkt: `docker/server/compose.yml` adoptiert die
+**bestehenden** Volumes (`docker_influxdb3-data`, `docker_postgres-data`) extern —
+es werden null Bytes kopiert, die Historie bleibt vollständig. Geplante Downtime:
+wenige Minuten plus der erste Build.
+
+**Niemals alten und neuen Stack gleichzeitig starten** — gleiche Volumes, gleiche
+Containernamen.
+
+1. **Automatik einfrieren** (sonst führt der Timer den Cutover unbeaufsichtigt
+   aus, sobald das neue Skript auf `develop` liegt):
+
+   ```bash
+   systemctl stop occupi-autodeploy.timer occupi-autodeploy.service
+   ```
+
+2. **Backups:**
+
+   ```bash
+   docker exec occupi-postgres pg_dumpall -U occupi > ~/backup-$(date +%F).sql
+   docker run --rm -v docker_influxdb3-data:/v -v ~/:/bk alpine \
+     tar czf /bk/influx-backup-$(date +%F).tgz /v
+   ```
+
+3. **Swap anlegen** (falls noch nicht vorhanden — siehe Kasten oben; ohne Swap
+   kann der erste Build die VM abschießen, das ist #140 in neu).
+
+4. **Repo aktualisieren:** `git -C /home/Elhan/Occupi pull --ff-only`
+
+5. **`docker/server/.env` füllen:** `cp docker/server/.env.example docker/server/.env`,
+   Werte aus der alten `docker/.env` übernehmen (`POSTGRES_PASSWORD`,
+   `KEYCLOAK_ADMIN_PASSWORD`; `KC_HOSTNAME` heißt jetzt `PUBLIC_HOST`), Neues
+   setzen (`GRAFANA_ADMIN_*`, `CORS_ALLOWED_ORIGINS`); `INFLUXDB_TOKEN` bleibt
+   vorerst der Platzhalter. `docker compose config` in `docker/server/` meldet
+   jede fehlende Pflichtvariable.
+
+6. **Alten Stack stoppen** (niemals `down -v` — die Volumes gehören jetzt dem
+   neuen Stack):
+
+   ```bash
+   cd /home/Elhan/Occupi/docker
+   docker compose -f docker-compose.yml -f docker-compose.prod.yml down
+   ```
+
+7. **InfluxDB-Token-Bootstrap** (Influx läuft ab jetzt MIT Auth):
+
+   ```bash
+   cd /home/Elhan/Occupi/docker/server
+   docker compose up -d influxdb          # Healthcheck bleibt rot, ist ok
+   docker exec occupi-influxdb3 influxdb3 create token --admin
+   # apiv3_...-Token in .env als INFLUXDB_TOKEN eintragen
+   ```
+
+8. **Stack hochziehen:** `docker compose up -d --build` (erster Build dauert
+   einige Minuten; Projekt `occupi`, externe Volumes docken an).
+
+9. **Verifizieren:** Startseite, `https://<host>/api/rooms` (Raumliste intakt),
+   Login über `/auth`, `/ws`-Verbindung des Pi (Reconnect-Queue des Senders
+   überbrückt den Neustart), History-Chart eines Bestandsraums (beweist das
+   Influx-Volume), Grafana-Datasource healthy (SSH-Tunnel auf :3001), und in
+   Postgres existiert die `sensors`-Tabelle samt FK (`\d sensors`).
+
+10. **Keycloak-Hinweis:** Der Realm existiert bereits in Postgres —
+    `realm-server.json` wird auf der VM nie importiert; Realm-Änderungen laufen
+    weiter über die Admin-Console.
+
+11. **Laufender Pi — null Datenlücke:** Der Sender schickt unverändert
+    `{roomId, sensorId, …}`; das Backend liest das als Claim + Geräte-ID, der
+    Raum existiert, die Daten fließen weiter. Beim späteren Umzug des Pi auf
+    `raspberry/docker/` **dieselbe `SENSOR_ID` (`sensor-01`) wiederverwenden**,
+    damit Registry- und Metrik-Historie zusammenbleiben.
+
+12. **Automatik wieder aktivieren:**
+
+    ```bash
+    systemctl start occupi-autodeploy.timer
+    journalctl -u occupi-autodeploy -f     # einen grünen Lauf abwarten
+    ```
+
+**Rollback:** Solange die alten Compose-Dateien existieren (`docker/docker-compose*.yml`,
+Löschung erst nach Soak-Phase): neuen Stack `down` (ohne `-v`), alten mit
+`-f docker-compose.yml -f docker-compose.prod.yml up -d` starten — die Daten
+liegen in denselben Volumes. Influx-Auth-Probleme: übergangsweise
+`--without-auth` in `docker/server/compose.yml` re-aktivieren und forward fixen.
+Postgres-Notfall: Dump aus Schritt 2 einspielen.
 
 ## Demo data seed
 
@@ -134,10 +237,9 @@ One run always drops and reseeds the whole table, so repeating it is safe.
    recreates the cache with the backend's exact definition right after the
    first chunk (#294).
 3. **Upserts the demo rooms** in the Postgres `rooms` table. The traffic light
-   divides live counts by these capacities, so the live rooms must match
-   `DEMO_ROOMS` in `raspberry/config.py` exactly (`016E:50`, `136:20`,
-   `011:250`). Room 137 keeps whatever the admin panel says; the Keycloak
-   database is never touched.
+   divides live counts by these capacities, so the live rooms must match the
+   demo sender's room list exactly (`016E:50`, `136:20`, `011:250`). Room 137
+   keeps whatever the admin panel says; the Keycloak database is never touched.
 4. **Restarts the backend.** It creates its InfluxDB caches only at startup
    (#294), and the restart also drops the chart caches (#280), so the fresh
    data shows up immediately.
