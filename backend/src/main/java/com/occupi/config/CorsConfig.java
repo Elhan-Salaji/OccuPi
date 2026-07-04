@@ -1,5 +1,6 @@
 package com.occupi.config;
 
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.cors.CorsConfiguration;
@@ -16,19 +17,17 @@ import java.util.List;
  * preflight requests are allowed through before authentication. This is required
  * for the browser-based frontend (different origin) to call the secured REST API.
  *
- * WebSocket CORS is configured separately in WebSocketConfig.
+ * The allowed origins come from {@link CorsProperties}; the WebSocket handshake
+ * in WebSocketConfig consumes the same list.
  */
 @Configuration
+@EnableConfigurationProperties(CorsProperties.class)
 public class CorsConfig {
 
     @Bean
-    public CorsConfigurationSource corsConfigurationSource() {
+    public CorsConfigurationSource corsConfigurationSource(CorsProperties corsProperties) {
         CorsConfiguration config = new CorsConfiguration();
-        // Any localhost port (dev servers, test pages) + the production domain.
-        config.setAllowedOriginPatterns(List.of(
-                "http://localhost:*",
-                "https://occupi.mi.hdm-stuttgart.de"
-        ));
+        config.setAllowedOriginPatterns(corsProperties.getAllowedOrigins());
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("*"));
         config.setAllowCredentials(true);
