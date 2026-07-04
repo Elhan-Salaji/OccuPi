@@ -1,0 +1,62 @@
+name: Python CI
+
+on:
+  push:
+    branches:
+      - develop
+      - main
+    paths:
+      - 'raspberry/**'
+      - 'docker/local/mock/**'
+  pull_request:
+    branches:
+      - develop
+      - main
+    paths:
+      - 'raspberry/**'
+      - 'docker/local/mock/**'
+
+jobs:
+  raspberry-tests:
+    name: Run Raspberry Sender Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Install dependencies
+        working-directory: raspberry
+        run: pip install -r requirements-dev.txt
+
+      - name: Run tests
+        working-directory: raspberry
+        run: python -m pytest -v
+
+  mock-fleet-tests:
+    name: Run Mock Fleet Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Install dependencies
+        working-directory: docker/local/mock
+        run: pip install -r requirements.txt pytest
+
+      - name: Run tests
+        working-directory: docker/local/mock
+        run: python -m pytest tests -v
