@@ -1,6 +1,7 @@
 package com.occupi.feature.metrics;
 
 import com.occupi.feature.metrics.dto.Metrics;
+import com.occupi.feature.sensor.SensorRegistryService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -22,6 +23,9 @@ class PiMetricsServiceImplTest {
 
     @Mock
     private MetricsService metricsService;
+
+    @Mock
+    private SensorRegistryService sensorRegistry;
 
     @InjectMocks
     private PiMetricsServiceImpl service;
@@ -55,7 +59,25 @@ class PiMetricsServiceImplTest {
     void process_null_ignored() {
         service.process(null);
 
-        verifyNoInteractions(metricsService);
+        verifyNoInteractions(metricsService, sensorRegistry);
+    }
+
+    @Test
+    @DisplayName("registers the device in the sensor registry on every snapshot")
+    void process_touchesRegistry() {
+        service.process(sample());
+
+        verify(sensorRegistry).touch("sensor-A");
+    }
+
+    @Test
+    @DisplayName("rejects an invalid sensorId before registry and persistence")
+    void process_invalidSensorIdRejected() {
+        Metrics invalid = new Metrics("bad sensor!", 42.0, 60.0, 3, 100, 1, 12.5f, Instant.now());
+
+        service.process(invalid);
+
+        verifyNoInteractions(metricsService, sensorRegistry);
     }
 
     @Test

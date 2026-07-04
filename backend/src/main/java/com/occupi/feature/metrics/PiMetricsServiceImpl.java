@@ -1,6 +1,7 @@
 package com.occupi.feature.metrics;
 
 import com.occupi.feature.metrics.dto.Metrics;
+import com.occupi.feature.sensor.SensorRegistryService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -22,10 +23,15 @@ import org.springframework.stereotype.Service;
 public class PiMetricsServiceImpl implements PiMetricsService {
 
     private final MetricsService metricsService;
+    private final SensorRegistryService sensorRegistry;
 
     /**
      * Processes incoming Pi metrics by mapping them to a metrics record
      * and persisting it to the database.
+     *
+     * The metrics stream also feeds the sensor registry: a freshly connected Pi
+     * shows up in the admin panel with a live "last seen" before it ever sends
+     * occupancy, and regardless of whether its room claim resolves.
      *
      * @param metrics the Pi metrics received via STOMP
      *                If null, the data is silently ignored.
@@ -36,6 +42,11 @@ public class PiMetricsServiceImpl implements PiMetricsService {
             log.warn("Received null PiMetrics, ignoring");
             return;
         }
+        if (!SensorRegistryService.isValidSensorId(metrics.sensorId())) {
+            log.warn("Rejected Pi metrics with invalid sensorId '{}'", metrics.sensorId());
+            return;
+        }
+        sensorRegistry.touch(metrics.sensorId());
 
         try {
             MetricsData metricsData = mapToMetricsData(metrics);
