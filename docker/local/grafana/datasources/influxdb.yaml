@@ -1,0 +1,18 @@
+# FlightSQL datasource for the local InfluxDB 3 (no auth — the local instance
+# runs --without-auth and is only published to your machine). The server stack
+# provisions the same datasource with token auth instead.
+apiVersion: 1
+
+datasources:
+  - name: InfluxDB (FlightSQL)
+    uid: occupi-influxdb
+    type: influxdata-flightsql-datasource
+    access: proxy
+    isDefault: true
+    editable: true
+    jsonData:
+      host: influxdb:8181
+      secure: false
+      selectedAuthType: none
+      metadata:
+        - database: occupi
