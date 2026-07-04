@@ -26,9 +26,11 @@ import java.util.concurrent.atomic.AtomicLong;
  *
  * Hot path: one Caffeine lookup per message. The cache entry remembers the claim it
  * was computed for, so a Pi restart (same claim) never touches the database; only a
- * changed claim, a cache miss or an explicit invalidation goes to Postgres. The
- * short TTL is a backstop — every user-visible change (assignment, room CRUD)
- * invalidates explicitly.
+ * changed claim, a cache miss or an explicit invalidation goes to Postgres.
+ * Unresolved devices are never cached: the error case stays cheap (one lookup per
+ * second per misconfigured Pi) and heals on the next message once the room exists
+ * or an admin assigns one. Deleting a room can leave a resolved entry stale for at
+ * most the cache TTL — the documented backstop.
  *
  * last-seen updates are buffered in memory and flushed on a schedule, the same
  * decoupling the occupancy write buffer uses: at one message per second per Pi,
@@ -81,11 +83,15 @@ public class SensorRegistryServiceImpl implements SensorRegistryService {
         }
         try {
             CachedResolution fresh = resolveAgainstDatabase(sensorId, claimedRoomId);
-            resolutions.put(sensorId, fresh);
-            pendingSeen.put(sensorId, Instant.now());
+            // Only resolved devices are cached. An unresolved device re-checks the
+            // database on every message (~1/s), so creating the missing room or
+            // assigning one takes effect on the very next message — no invalidation
+            // hooks in the room feature needed.
             if (fresh.effectiveRoomId() != null) {
+                resolutions.put(sensorId, fresh);
                 drops.remove(sensorId);
             }
+            pendingSeen.put(sensorId, Instant.now());
             return Optional.ofNullable(fresh.effectiveRoomId());
         } catch (DataAccessException e) {
             // Fail closed: this message counts as unresolved, the STOMP handler
