@@ -30,7 +30,11 @@ log = logging.getLogger("mock-pis")
 BACKEND_HOST = os.getenv("BACKEND_HOST", "localhost")
 BACKEND_PORT = int(os.getenv("BACKEND_PORT", "8080"))
 BACKEND_WS_PATH = os.getenv("BACKEND_WS_PATH", "/ws")
+BACKEND_TLS = os.getenv("BACKEND_TLS", "false").strip().lower() in ("1", "true", "yes")
 MOCK_ROOMS = os.getenv("MOCK_ROOMS", "006:20,011:15,137:30")
+# "walk" (default): independent random walks. "demo": the scripted dashboard
+# scenario (traffic-light bands, over-capacity pulses, health profiles).
+MOCK_MODE = os.getenv("MOCK_MODE", "walk").strip().lower()
 OCCUPANCY_INTERVAL = float(os.getenv("MOCK_OCCUPANCY_INTERVAL", "5"))
 METRICS_INTERVAL = float(os.getenv("MOCK_METRICS_INTERVAL", "30"))
 MAX_STEP = int(os.getenv("MOCK_MAX_STEP", "2"))
@@ -146,6 +150,11 @@ def run(pis):
         heartbeats=(25000, 25000),
         ws_path=BACKEND_WS_PATH,
     )
+    if BACKEND_TLS:
+        # wss:// with server-certificate validation — needed when the demo mode
+        # targets the production endpoint through nginx.
+        import certifi
+        conn.set_ssl(for_hosts=[(BACKEND_HOST, BACKEND_PORT)], ca_certs=certifi.where())
 
     # Stagger the Pis so their messages don't arrive as one burst.
     now = time.monotonic()
@@ -186,8 +195,15 @@ def main():
     except ValueError as e:
         log.error("%s", e)
         sys.exit(1)
-    pis = [VirtualPi(r["roomId"], r["capacity"], r["sensorId"]) for r in rooms]
-    log.info("Simulating %d Pis: %s", len(pis), ", ".join(p.sensor_id for p in pis))
+    if MOCK_MODE == "demo":
+        from demo_pis import DemoPi
+        pis = [DemoPi(r["roomId"], r["capacity"], r["sensorId"], band_index=i)
+               for i, r in enumerate(rooms)]
+        log.info("DEMO mode: scripted scenario for %d Pis: %s",
+                 len(pis), ", ".join(p.sensor_id for p in pis))
+    else:
+        pis = [VirtualPi(r["roomId"], r["capacity"], r["sensorId"]) for r in rooms]
+        log.info("Simulating %d Pis: %s", len(pis), ", ".join(p.sensor_id for p in pis))
     run(pis)
 
 
