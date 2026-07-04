@@ -24,6 +24,8 @@ import org.springframework.security.web.SecurityFilterChain;
  *   <li>OpenAPI / Swagger UI — public</li>
  *   <li>Room mutations (POST/PUT/DELETE {@code /api/rooms/**}) — {@code admin} role only,
  *       enforced both here at the URL level and via {@code @PreAuthorize} on the controller</li>
+ *   <li>Sensor registry mutations (PUT/DELETE {@code /api/sensors/**}) — {@code admin}
+ *       role only, same two-layer enforcement</li>
  *   <li>everything else — any authenticated user with a valid JWT</li>
  * </ul>
  *
@@ -47,6 +49,8 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/api/rooms/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.PUT, "/api/rooms/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.DELETE, "/api/rooms/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.PUT, "/api/sensors/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.DELETE, "/api/sensors/**").hasRole("ADMIN")
                         .anyRequest().authenticated()
                 )
                 .oauth2ResourceServer(oauth2 -> oauth2
