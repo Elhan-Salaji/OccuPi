@@ -1,0 +1,19 @@
+# FlightSQL datasource for the server InfluxDB 3 — token auth, unlike local.
+# $INFLUXDB_TOKEN is expanded by Grafana's provisioning from the container env.
+apiVersion: 1
+
+datasources:
+  - name: InfluxDB (FlightSQL)
+    uid: occupi-influxdb
+    type: influxdata-flightsql-datasource
+    access: proxy
+    isDefault: true
+    editable: true
+    jsonData:
+      host: influxdb:8181
+      secure: false
+      selectedAuthType: token
+      metadata:
+        - database: occupi
+    secureJsonData:
+      token: $INFLUXDB_TOKEN
