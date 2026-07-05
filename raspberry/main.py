@@ -10,20 +10,19 @@ import serial
 import stomp
 import certifi
 
+import config
 from config import (
     BACKEND_HOST, BACKEND_PORT,
     STOMP_DESTINATION, STOMP_METRICS_DESTINATION,
     QUEUE_MAX_SIZE,
     WS_RECONNECT_DELAY, WS_MAX_RETRIES, BACKEND_WS_PATH,
     BACKEND_TLS, BACKEND_TLS_CA,
-    SENSOR_MODE, SENSOR_ID, ROOM_ID, MOCK_ROOM_IDS, DEMO_ROOMS,
+    SENSOR_ID,
     USE_VISUALIZER, VISUALIZER_MAX_FPS,
 )
 from sensor.receiver import open_ports, send_config, read_frame, CONFIG_FILE
 from sensor.metrics import ThroughputMetrics, start_metrics_monitor
 from sender.processor import map_to_occupancy
-from mock_data import mock_sensor_loop
-from demo_data import SentCounters, demo_sensor_loop, parse_rooms, start_demo_metrics
 from stomp import exception as stomp_exception
 
 # Logging configuration
@@ -34,16 +33,7 @@ logging.basicConfig(
 )
 log = logging.getLogger(__name__)
 
-# Parsed once at import: a malformed DEMO_ROOMS fails fast at startup instead
-# of mid-demo, and the queue below can be sized for the room count.
-DEMO_ROOM_SPECS = parse_rooms(DEMO_ROOMS) if SENSOR_MODE == "demo" else []
-
-# Size the queue for the workload: in multi-room mock and demo the generator
-# enqueues one frame per room each tick, so the queue must hold more than the
-# room count.
-_queue: queue.Queue = queue.Queue(
-    maxsize=max(QUEUE_MAX_SIZE, len(MOCK_ROOM_IDS) * 3, len(DEMO_ROOM_SPECS) * 3)
-)
+_queue: queue.Queue = queue.Queue(maxsize=QUEUE_MAX_SIZE)
 _metrics = ThroughputMetrics()
 
 # Shared STOMP connection, owned by the sender loop. The metrics thread reads it
@@ -142,8 +132,7 @@ def start_sender() -> None:
 def _send_metrics(snapshot: dict, sensor_id: str = SENSOR_ID) -> None:
     """Forwards a metrics snapshot to the backend over the shared STOMP link (#110).
     Tags it with the sensorId and a UTC timestamp, sent explicitly so the backend
-    does not have to assign one (see #186). Skips the send when the link is down.
-    Demo mode passes per-room sensor ids; everything else reports as SENSOR_ID."""
+    does not have to assign one (see #186). Skips the send when the link is down."""
     conn = _conn
     if conn is None or not conn.is_connected():
         log.debug("STOMP not connected, skipping metrics snapshot.")
@@ -166,59 +155,45 @@ def _send_metrics(snapshot: dict, sensor_id: str = SENSOR_ID) -> None:
 
 # Main execution
 if __name__ == '__main__':
+    # One Pi = one radar = one room: refuse to start without a full identity —
+    # a silent default id would feed a phantom room (the trap the sensor
+    # registry exists to catch).
+    config.validate()
+
     cfg_port = None
     data_port = None
 
     try:
         start_sender()
-        # In demo mode the backend gets the scripted per-sensor health instead —
-        # the real psutil snapshot would sit next to the demo sensors as one
-        # always-green entry. The local metrics log line stays on in every mode.
-        start_metrics_monitor(
-            _queue, _metrics,
-            send_fn=None if SENSOR_MODE == "demo" else _send_metrics,
-        )
+        start_metrics_monitor(_queue, _metrics, send_fn=_send_metrics)
 
-        if SENSOR_MODE == "demo":
-            log.info(
-                "Starting in DEMO mode, scripted dashboard scenario for %d room(s).",
-                len(DEMO_ROOM_SPECS),
-            )
-            counters = SentCounters()
-            start_demo_metrics(DEMO_ROOM_SPECS, counters, send_fn=_send_metrics)
-            demo_sensor_loop(enqueue_frame, DEMO_ROOM_SPECS, counters)  # runs until stopped
-        elif SENSOR_MODE == "mock":
-            rooms = MOCK_ROOM_IDS or [ROOM_ID]
-            log.info("Starting in MOCK mode, fake occupancy for %d room(s).", len(rooms))
-            mock_sensor_loop(enqueue_frame, rooms)  # runs until the process is stopped
-        else:
-            log.info("Starting in REAL mode, reading from the mmWave sensor.")
-            cfg_port, data_port = open_ports()
-            send_config(cfg_port, CONFIG_FILE)
+        log.info("Reading from the mmWave sensor (room %s, device %s).", config.ROOM_ID, SENSOR_ID)
+        cfg_port, data_port = open_ports()
+        send_config(cfg_port, CONFIG_FILE)
 
-            # The live view pulls in matplotlib, so only import it when actually
-            # enabled — keeps the headless/mock path free of GUI dependencies.
-            visualizer_update = None
-            if USE_VISUALIZER:
-                from visualizer.visualizer import start_visualizer, update as visualizer_update
-                start_visualizer()
-            render_interval = 1.0 / VISUALIZER_MAX_FPS
-            last_render = 0.0
+        # The live view pulls in matplotlib, so only import it when actually
+        # enabled — keeps the headless path free of GUI dependencies.
+        visualizer_update = None
+        if USE_VISUALIZER:
+            from visualizer.visualizer import start_visualizer, update as visualizer_update
+            start_visualizer()
+        render_interval = 1.0 / VISUALIZER_MAX_FPS
+        last_render = 0.0
 
-            while True:
-                t_start = time.monotonic()
-                frame_num, people_count, point_cloud, targets = read_frame(data_port)
-                enqueue_frame({"frameNum": frame_num, "numDetectedTracks": people_count})
+        while True:
+            t_start = time.monotonic()
+            frame_num, people_count, point_cloud, targets = read_frame(data_port)
+            enqueue_frame({"frameNum": frame_num, "numDetectedTracks": people_count})
 
-                # Throttled redraw: a full render can take longer than one sensor
-                # frame, and rendering every frame backs up the serial buffer until
-                # it overflows and the parser desyncs.
-                if visualizer_update is not None and t_start - last_render >= render_interval:
-                    visualizer_update(point_cloud, targets)
-                    last_render = t_start
+            # Throttled redraw: a full render can take longer than one sensor
+            # frame, and rendering every frame backs up the serial buffer until
+            # it overflows and the parser desyncs.
+            if visualizer_update is not None and t_start - last_render >= render_interval:
+                visualizer_update(point_cloud, targets)
+                last_render = t_start
 
-                latency = (time.monotonic() - t_start) * 1000  # ms
-                log.info(f"Frame {frame_num}: Detected {people_count} people | Latency: {latency:.1f}ms")
+            latency = (time.monotonic() - t_start) * 1000  # ms
+            log.info(f"Frame {frame_num}: Detected {people_count} people | Latency: {latency:.1f}ms")
 
     except serial.SerialException as e:
         log.error(f"Error: Couldn't find sensor. {e}")
