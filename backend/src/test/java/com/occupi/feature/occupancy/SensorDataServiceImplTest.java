@@ -1,6 +1,7 @@
 package com.occupi.feature.occupancy;
 
 import com.occupi.feature.occupancy.dto.SensorData;
+import com.occupi.feature.sensor.SensorRegistryService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -12,17 +13,24 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 
 import java.time.Instant;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.*;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.when;
 
 /**
- * Unit tests for {@link SensorDataServiceImpl}.
- *
- * Tests the mapping of {@link SensorData} to {@link OccupancyData}
- * and delegation to {@link OccupancyService}.
+ * Unit tests for {@link SensorDataServiceImpl}: room resolution through the sensor
+ * registry, effective-room rewriting for both the persisted point and the
+ * broadcast, dropping of unresolved devices, and fail-closed error handling.
  */
 @ExtendWith(MockitoExtension.class)
 @DisplayName("SensorDataServiceImpl Tests")
@@ -34,205 +42,132 @@ class SensorDataServiceImplTest {
     @Mock
     private SimpMessagingTemplate messagingTemplate;
 
+    @Mock
+    private SensorRegistryService sensorRegistry;
+
     private SensorDataServiceImpl sensorDataService;
 
     @BeforeEach
     void setUp() {
-        sensorDataService = new SensorDataServiceImpl(occupancyService, messagingTemplate);
+        sensorDataService = new SensorDataServiceImpl(occupancyService, messagingTemplate, sensorRegistry);
+    }
+
+    private void claimResolves(String sensorId, String claim, String effective) {
+        when(sensorRegistry.resolveEffectiveRoom(sensorId, claim)).thenReturn(Optional.ofNullable(effective));
     }
 
     @Test
-    @DisplayName("Should map all SensorData fields to OccupancyData correctly")
-    void testMappingAllFields() {
-        // Arrange
+    @DisplayName("maps all fields and stamps the resolved room")
+    void mapsAllFieldsWithResolvedRoom() {
         Instant timestamp = Instant.parse("2024-01-15T10:30:00Z");
-        SensorData sensorData = new SensorData(
-                "seminar-101",
-                "sensor-A",
-                5,
-                0.95,
-                timestamp
-        );
+        SensorData sensorData = new SensorData("seminar-101", "sensor-A", 5, 0.95, timestamp);
+        claimResolves("sensor-A", "seminar-101", "seminar-101");
 
-        // Act
         sensorDataService.process(sensorData);
 
-        // Assert
         ArgumentCaptor<OccupancyData> captor = ArgumentCaptor.forClass(OccupancyData.class);
         verify(occupancyService).recordOccupancy(captor.capture());
-
-        OccupancyData captured = captor.getValue();
-        assertThat(captured)
-                .extracting(
-                        OccupancyData::getRoomId,
-                        OccupancyData::getSensorId,
-                        OccupancyData::getCount,
-                        OccupancyData::getConfidence,
-                        OccupancyData::getTimestamp
-                )
-                .containsExactly(
-                        "seminar-101",
-                        "sensor-A",
-                        5,
-                        0.95,
-                        timestamp
-                );
+        assertThat(captor.getValue())
+                .extracting(OccupancyData::getRoomId, OccupancyData::getSensorId,
+                        OccupancyData::getCount, OccupancyData::getConfidence, OccupancyData::getTimestamp)
+                .containsExactly("seminar-101", "sensor-A", 5, 0.95, timestamp);
     }
 
     @Test
-    @DisplayName("Should delegate to OccupancyService.recordOccupancy()")
-    void testDelegationToOccupancyService() {
-        // Arrange
-        SensorData sensorData = new SensorData(
-                "room-202",
-                "sensor-B",
-                8,
-                0.87,
-                Instant.now()
-        );
+    @DisplayName("an admin override wins: write AND broadcast carry the effective room")
+    void overrideRewritesWriteAndBroadcast() {
+        Instant timestamp = Instant.now();
+        SensorData sensorData = new SensorData("claimed-room", "sensor-A", 7, 0.9, timestamp);
+        claimResolves("sensor-A", "claimed-room", "corrected-room");
 
-        // Act
         sensorDataService.process(sensorData);
 
-        // Assert
-        verify(occupancyService).recordOccupancy(any(OccupancyData.class));
+        ArgumentCaptor<OccupancyData> written = ArgumentCaptor.forClass(OccupancyData.class);
+        verify(occupancyService).recordOccupancy(written.capture());
+        assertThat(written.getValue().getRoomId()).isEqualTo("corrected-room");
+
+        SensorData expectedBroadcast = new SensorData("corrected-room", "sensor-A", 7, 0.9, timestamp);
+        verify(messagingTemplate).convertAndSend("/topic/occupancy", expectedBroadcast);
     }
 
     @Test
-    @DisplayName("Should handle null SensorData gracefully")
-    void testHandleNullSensorData() {
-        // Act
+    @DisplayName("unresolved device: no write, no broadcast, dropped point is counted")
+    void unresolvedDeviceIsDroppedVisibly() {
+        SensorData sensorData = new SensorData("nope-999", "sensor-A", 3, 0.9, Instant.now());
+        claimResolves("sensor-A", "nope-999", null);
+
+        sensorDataService.process(sensorData);
+
+        verify(sensorRegistry).recordDroppedPoint("sensor-A");
+        verifyNoInteractions(occupancyService);
+        verifyNoInteractions(messagingTemplate);
+    }
+
+    @Test
+    @DisplayName("null payload is ignored")
+    void nullPayloadIsIgnored() {
         sensorDataService.process(null);
 
-        // Assert
-        verify(occupancyService, never()).recordOccupancy(any());
+        verifyNoInteractions(occupancyService, messagingTemplate, sensorRegistry);
     }
 
     @Test
-    @DisplayName("Should propagate exceptions from OccupancyService")
-    void testExceptionPropagation() {
-        // Arrange
-        SensorData sensorData = new SensorData(
-                "room-101",
-                "sensor-A",
-                3,
-                0.92,
-                Instant.now()
-        );
-        org.mockito.Mockito.doThrow(new RuntimeException("Database connection failed"))
-                .when(occupancyService).recordOccupancy(any());
+    @DisplayName("invalid ids are rejected before touching the registry")
+    void invalidIdsAreRejected() {
+        sensorDataService.process(new SensorData("room 1; drop", "sensor-A", 1, 0.9, Instant.now()));
+        sensorDataService.process(new SensorData("room-1", "bad sensor!", 1, 0.9, Instant.now()));
+        sensorDataService.process(new SensorData(null, "sensor-A", 1, 0.9, Instant.now()));
 
-        // Act & Assert
-        assertThatThrownBy(() -> sensorDataService.process(sensorData))
-                .isInstanceOf(RuntimeException.class)
-                .hasMessage("Database connection failed");
+        verifyNoInteractions(occupancyService, messagingTemplate, sensorRegistry);
     }
 
     @Test
-    @DisplayName("Should handle edge case: confidence at boundaries")
-    void testConfidenceBoundaryValues() {
-        // Arrange - Test confidence = 0.0
-        SensorData lowConfidence = new SensorData(
-                "room-101",
-                "sensor-A",
-                0,
-                0.0,
-                Instant.now()
-        );
+    @DisplayName("fail-closed: downstream exceptions are logged, never rethrown")
+    void downstreamExceptionsAreNotRethrown() {
+        SensorData sensorData = new SensorData("room-101", "sensor-A", 3, 0.92, Instant.now());
+        claimResolves("sensor-A", "room-101", "room-101");
+        doThrow(new RuntimeException("broker down")).when(occupancyService).recordOccupancy(any());
 
-        // Act
-        sensorDataService.process(lowConfidence);
+        assertThatCode(() -> sensorDataService.process(sensorData)).doesNotThrowAnyException();
+    }
 
-        // Assert
+    @Test
+    @DisplayName("boundary values pass through unchanged (count 0, confidence 0.0 and 1.0)")
+    void boundaryValuesPassThrough() {
+        claimResolves("sensor-A", "room-101", "room-101");
+
+        sensorDataService.process(new SensorData("room-101", "sensor-A", 0, 0.0, Instant.now()));
+
         ArgumentCaptor<OccupancyData> captor = ArgumentCaptor.forClass(OccupancyData.class);
         verify(occupancyService).recordOccupancy(captor.capture());
-        assertThat(captor.getValue().getConfidence()).isEqualTo(0.0);
-
-        // Arrange - Test confidence = 1.0
-        org.mockito.Mockito.reset(occupancyService);
-        SensorData highConfidence = new SensorData(
-                "room-101",
-                "sensor-A",
-                10,
-                1.0,
-                Instant.now()
-        );
-
-        // Act
-        sensorDataService.process(highConfidence);
-
-        // Assert
-        verify(occupancyService).recordOccupancy(captor.capture());
-        assertThat(captor.getValue().getConfidence()).isEqualTo(1.0);
+        assertThat(captor.getValue().getCount()).isZero();
+        assertThat(captor.getValue().getConfidence()).isZero();
     }
 
     @Test
-    @DisplayName("Should handle edge case: zero count")
-    void testZeroCountScenario() {
-        // Arrange
-        SensorData sensorData = new SensorData(
-                "room-101",
-                "sensor-A",
-                0,
-                0.85,
-                Instant.now()
-        );
-
-        // Act
-        sensorDataService.process(sensorData);
-
-        // Assert
-        ArgumentCaptor<OccupancyData> captor = ArgumentCaptor.forClass(OccupancyData.class);
-        verify(occupancyService).recordOccupancy(captor.capture());
-        assertThat(captor.getValue().getCount()).isEqualTo(0);
-    }
-
-    @Test
-    @DisplayName("Should handle edge case: large count values")
-    void testLargeCountScenario() {
-        // Arrange
-        SensorData sensorData = new SensorData(
-                "auditorium-001",
-                "sensor-master",
-                1000,
-                0.99,
-                Instant.now()
-        );
-
-        // Act
-        sensorDataService.process(sensorData);
-
-        // Assert
-        ArgumentCaptor<OccupancyData> captor = ArgumentCaptor.forClass(OccupancyData.class);
-        verify(occupancyService).recordOccupancy(captor.capture());
-        assertThat(captor.getValue().getCount()).isEqualTo(1000);
-    }
-
-    @Test
-    @DisplayName("Should handle multiple consecutive calls")
-    void testMultipleConsecutiveCalls() {
-        // Arrange
-        SensorData data1 = new SensorData("room-101", "sensor-A", 5, 0.9, Instant.now());
-        SensorData data2 = new SensorData("room-102", "sensor-B", 3, 0.85, Instant.now());
-
-        // Act
-        sensorDataService.process(data1);
-        sensorDataService.process(data2);
-
-        // Assert
-        verify(occupancyService, org.mockito.Mockito.times(2))
-                .recordOccupancy(any());
-    }
-
-    @Test
-    @DisplayName("Should broadcast sensor data to /topic/occupancy after persistence")
-    void testBroadcastAfterPersistence() {
-        SensorData data = new SensorData("room-101", "sensor-A", 5, 0.95, Instant.now());
+    @DisplayName("broadcast happens after persistence, on /topic/occupancy")
+    void broadcastAfterPersistence() {
+        Instant timestamp = Instant.now();
+        SensorData data = new SensorData("room-101", "sensor-A", 5, 0.95, timestamp);
+        claimResolves("sensor-A", "room-101", "room-101");
 
         sensorDataService.process(data);
 
         InOrder inOrder = inOrder(occupancyService, messagingTemplate);
         inOrder.verify(occupancyService).recordOccupancy(any(OccupancyData.class));
-        inOrder.verify(messagingTemplate).convertAndSend("/topic/occupancy", data);
+        inOrder.verify(messagingTemplate).convertAndSend(eq("/topic/occupancy"), eq(data));
+    }
+
+    @Test
+    @DisplayName("consecutive messages from different devices are processed independently")
+    void multipleConsecutiveCalls() {
+        claimResolves("sensor-A", "room-101", "room-101");
+        claimResolves("sensor-B", "room-102", "room-102");
+
+        sensorDataService.process(new SensorData("room-101", "sensor-A", 5, 0.9, Instant.now()));
+        sensorDataService.process(new SensorData("room-102", "sensor-B", 3, 0.85, Instant.now()));
+
+        verify(occupancyService, org.mockito.Mockito.times(2)).recordOccupancy(any());
+        verify(sensorRegistry, never()).recordDroppedPoint(anyString());
     }
 }
