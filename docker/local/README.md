@@ -67,6 +67,11 @@ Der lokale Realm läuft mit `sslRequired: none`: Der Stack spricht bewusst
 Mit `external` (dem Server-Wert) antwortet Keycloak sonst mit „HTTPS required",
 sobald eine Anfrage nicht von einer als lokal geltenden Adresse kommt.
 
+Für die **Admin-Console** (master-Realm, den Keycloak selbst anlegt und der
+nie importiert wird) erledigt das der `keycloak-init`-Einmaldienst bei jedem
+Start — ohne ihn bliebe die Console unter Docker Desktop mit „HTTPS required"
+gesperrt.
+
 **Realm-Änderungen:** `--import-realm` importiert `keycloak/realm-local.json`
 nur in eine leere Keycloak-Datenbank. Nach einer Änderung an der Datei:
 `docker compose down -v && docker compose up -d --build`.
