@@ -152,6 +152,27 @@ services:
       start_period: 30s
     restart: unless-stopped
 
+  # One-shot: allows plain-HTTP access to the ADMIN CONSOLE (master realm).
+  # The occupi realm gets sslRequired=none via the import file, but Keycloak
+  # bootstraps the master realm itself — it is never imported. Docker Desktop
+  # hands host connections to the container with a source address Keycloak does
+  # not treat as local, so without this the console answers "HTTPS required".
+  # Idempotent, runs on every up, survives `down -v`.
+  keycloak-init:
+    image: quay.io/keycloak/keycloak:26.2
+    restart: "no"
+    entrypoint: ["/bin/bash", "-c"]
+    command:
+      - >
+        /opt/keycloak/bin/kcadm.sh config credentials
+        --server http://keycloak:8080 --realm master
+        --user ${KEYCLOAK_ADMIN:-admin} --password ${KEYCLOAK_ADMIN_PASSWORD:-admin}
+        && /opt/keycloak/bin/kcadm.sh update realms/master -s sslRequired=NONE
+        && echo "master realm: sslRequired=NONE (plain-HTTP admin console)"
+    depends_on:
+      keycloak:
+        condition: service_healthy
+
   grafana:
     image: grafana/grafana:11.6.1
     environment:
