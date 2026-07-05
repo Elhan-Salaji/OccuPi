@@ -1,39 +1,38 @@
 # Contributing
 
-So arbeiten wir in diesem Repo. Die Regeln sind kurz, weil sie konsequent gelten —
-der Commit-Check in der CI erzwingt einen Teil davon automatisch.
+How we work in this repo. The rules are short because they apply without
+exception — the commit check in CI enforces part of them automatically.
 
 ## Workflow
 
-1. **Issue zuerst.** Jede Änderung beginnt mit einem Issue (Objective / Tasks /
-   Acceptance criteria). Kein Branch ohne Issue-Nummer.
-2. **Branch von develop.** Name: `typ/kurze-beschreibung-#issue`, z. B.
-   `feature/sensor-registry-#310` oder `fix/admin-panel-responsive-#305`.
-3. **Kleine Commits, einzeln gepusht.** Format `typ: beschreibung #issue`
-   (erlaubte Typen prüft `.github/scripts/check_commits.py`). Erst committen,
-   dann pushen, dann der nächste Commit — keine lokal angesammelten Stapel.
-4. **PR gegen develop** am Ende, Review, Merge-Commit (kein Squash, kein Rebase —
-   die Einzel-Commits sind Teil der Historie).
+1. **Issue first.** Every change starts with an issue (objective / tasks /
+   acceptance criteria). No branch without an issue number.
+2. **Branch from develop.** Name: `type/short-description-#issue`, e.g.
+   `feature/sensor-registry-#310` or `fix/admin-panel-responsive-#305`.
+3. **Small commits, pushed one at a time.** Format `type: description #issue`
+   (`.github/scripts/check_commits.py` checks the allowed types). Commit, push,
+   then the next commit — no piling up local commits and pushing them in a batch.
+4. **PR against develop** at the end, review, merge commit (no squash, no
+   rebase — the individual commits are part of the history).
 
-## Branching-Regeln
+## Branching rules
 
-- **Branches entstehen NUR von develop. Merges gehen NUR nach develop zurück.**
-  Keine Branches von Feature-Branches, keine Merges zwischen Feature-Branches.
-- Baut ein Thema auf einem noch offenen PR auf: warten, bis der gemerged ist,
-  und dann frisch von develop abzweigen. Gestackte PR-Ketten vermeiden wir —
-  sie haben uns einen History-Rewrite gekostet.
-- Falls eine Kette doch einmal unvermeidbar ist: streng von unten nach oben
-  mergen und **jeden Basis-Branch sofort nach seinem Merge löschen** — GitHub
-  retargetet den nächsten PR nur dann automatisch auf develop.
-- `main` bekommt ausschließlich Release-Merges von develop, mit SemVer-Tag
-  (`vX.Y.Z`) und geschnittenem CHANGELOG-Abschnitt.
+- **Branches come from develop only. Merges go back to develop only.**
+  No branches off feature branches, no merges between feature branches.
+- When a topic builds on a still-open PR: wait until it is merged, then branch
+  fresh from develop. We avoid stacked PR chains — one cost us a history rewrite.
+- If a chain is ever unavoidable: merge strictly bottom-up and **delete each
+  base branch right after its merge** — GitHub only retargets the next PR to
+  develop automatically when the base branch is gone.
+- `main` receives release merges from develop only, with a SemVer tag
+  (`vX.Y.Z`) and a cut CHANGELOG section.
 
-## Sonstiges
+## Everything else
 
-- CHANGELOG (`Keep a Changelog`) pro PR mitpflegen: Nutzersichtbares unter
-  `[Unreleased]` in der passenden Kategorie.
-- Architektur-Entscheidungen als ADR nach `docs/adr/`; Teil-spezifische
-  Logbücher liegen in `backend/docs/` und `raspberry/docs/`.
-- Secrets bleiben in git-ignorierten `.env`-Dateien (`docker/server/.env`,
-  `raspberry/docker/.env`); `docker/local/.env` ist bewusst committet und
-  enthält keine.
+- Maintain the CHANGELOG (`Keep a Changelog`) with each PR: user-visible
+  changes go under `[Unreleased]` in the matching category.
+- Architecture decisions go to `docs/adr/` as ADRs; the part-specific decision
+  logs live in `backend/docs/` and `raspberry/docs/`.
+- Secrets stay in git-ignored `.env` files (`docker/server/.env`,
+  `raspberry/docker/.env`); `docker/local/.env` is committed on purpose and
+  contains none.
