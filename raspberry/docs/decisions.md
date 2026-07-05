@@ -1,7 +1,8 @@
 # Entscheidungen (ADR-light)
 
 Kurze Logbuch-Einträge zu Setup-/Architektur-Entscheidungen, bewusst knapp, als
-institutionelles Gedächtnis (auch für KI-Kontext).
+institutionelles Gedächtnis (auch für KI-Kontext). Repo-weite Entscheidungen
+stehen in [`docs/adr/`](../../docs/adr/).
 
 ---
 

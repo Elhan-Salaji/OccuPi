@@ -90,7 +90,20 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `dialout` group, so on the Pi a plain `docker compose up` with `SENSOR_MODE=real` streams
   live occupancy for room 137 (#201).
 
+### Removed
+- `.github/workflows/images.yml` (GHCR image publishing): with both stacks building
+  from source there is no consumer left for registry images, and keeping a publisher
+  nobody deploys invites digest drift. Decision and the rejected runtime-config
+  alternative are recorded in ADR 0004 (#321).
+
 ### Changed
+- Repo-wide decisions now live in `docs/adr/` (configuration via env, sensor
+  claim/override mapping, local-vs-server layout incl. volume adoption, server
+  builds from source); the per-part logs in `backend/docs/` and `raspberry/docs/`
+  link there. The root README is rewritten around the new structure: three-command
+  quick start, how-to for adding a room and a real Pi, per-stack configuration
+  reference, updated troubleshooting and honest known gaps (ingest auth #322,
+  no re-tagging of historical points, ddl-auto without Flyway) (#321).
 - `raspberry/` is the real Pi only now: one Pi = one radar = one room = one
   container. The new `raspberry/docker/` compose starts exactly one sensor service;
   the radar unit is selected via `RADAR_SERIAL` (its CP2105 by-id serial) instead of
