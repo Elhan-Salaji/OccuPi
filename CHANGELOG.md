@@ -91,6 +91,18 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   live occupancy for room 137 (#201).
 
 ### Changed
+- `raspberry/` is the real Pi only now: one Pi = one radar = one room = one
+  container. The new `raspberry/docker/` compose starts exactly one sensor service;
+  the radar unit is selected via `RADAR_SERIAL` (its CP2105 by-id serial) instead of
+  a hardcoded device path, and `ROOM_ID`/`SENSOR_ID` are required — both compose and
+  `config.validate()` fail fast, because the old silent defaults
+  (`room-01`/`sensor-01`) fed phantom rooms on typos. Mock and demo moved to the
+  local stack: the scripted dashboard scenario (traffic-light bands, over-capacity
+  pulses, health profiles) now runs as `MOCK_MODE=demo` in `docker/local/mock/`,
+  incl. against the production endpoint for presentations. `mock_data.py`,
+  `demo_data.py`, `run.sh`, the old `raspberry/compose.yml` (sensor-01/02/demo
+  services) and the stale chirp-config reference in `docs/decisions.md` are gone
+  (#316).
 - Auto-deploy builds from source now: the systemd timer stays exactly as it is
   (5-minute tick, same units), but `deploy/auto-deploy.sh` triggers on new commits
   on `origin/develop` instead of moved GHCR digests, builds backend and frontend

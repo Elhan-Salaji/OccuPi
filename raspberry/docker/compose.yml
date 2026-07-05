@@ -1,0 +1,41 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# OccuPi — real Raspberry Pi sender. One Pi = one radar = one room = exactly
+# this ONE container.
+#
+#   cd raspberry/docker
+#   cp .env.example .env    → fill in every value
+#   docker compose up -d --build
+#
+# The radar (TI IWR6843, CP2105 dual UART) hangs off this Pi's USB; RADAR_SERIAL
+# in .env selects it by its stable by-id path (ls -l /dev/serial/by-id/).
+# Simulated Pis for development live in docker/local/ — not here.
+# ─────────────────────────────────────────────────────────────────────────────
+name: occupi-pi
+
+services:
+  sensor:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    image: occupi-pi-sender:local
+    container_name: occupi-sensor
+    environment:
+      ROOM_ID: ${ROOM_ID:?set ROOM_ID in raspberry/docker/.env (must match a room in the admin panel)}
+      SENSOR_ID: ${SENSOR_ID:?set SENSOR_ID in raspberry/docker/.env (stable device name, e.g. pi-bibliothek)}
+      BACKEND_HOST: ${BACKEND_HOST:?set BACKEND_HOST in raspberry/docker/.env}
+      BACKEND_PORT: ${BACKEND_PORT:-443}
+      BACKEND_TLS: ${BACKEND_TLS:-true}
+      BACKEND_TLS_CA: ${BACKEND_TLS_CA:-}
+      SERIAL_CFG_PORT: /dev/ttyUSB0
+      SERIAL_DATA_PORT: /dev/ttyUSB1
+      USE_VISUALIZER: "false"
+    # The radar's two USB serial interfaces, mapped by their stable by-id paths:
+    # if00 = config/CLI (115200), if01 = data (921600).
+    devices:
+      - "/dev/serial/by-id/usb-Silicon_Labs_CP2105_Dual_USB_to_UART_Bridge_Controller_${RADAR_SERIAL:?set RADAR_SERIAL in raspberry/docker/.env}-if00-port0:/dev/ttyUSB0"
+      - "/dev/serial/by-id/usb-Silicon_Labs_CP2105_Dual_USB_to_UART_Bridge_Controller_${RADAR_SERIAL}-if01-port0:/dev/ttyUSB1"
+    group_add:
+      - dialout
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
