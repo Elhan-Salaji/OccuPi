@@ -1,7 +1,8 @@
 # Entscheidungen (ADR-light)
 
 Kurze Logbuch-Einträge zu Architektur-Entscheidungen im Backend, bewusst knapp, als
-institutionelles Gedächtnis (auch für KI-Kontext).
+institutionelles Gedächtnis (auch für KI-Kontext). Repo-weite Entscheidungen
+(Konfiguration, Raum-Zuordnung, Docker-Layout, Deploy) stehen in [`docs/adr/`](../../docs/adr/).
 
 ---
 
