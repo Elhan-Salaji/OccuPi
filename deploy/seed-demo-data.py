@@ -58,7 +58,8 @@ LIVE_STOP_GAP = 300                   # live rooms: backfill ends now-5min, the
 # spread the data over three buildings and the floors -1..2 (#48).
 ROOMS = [
     # live rooms -- backfill only, the demo sender (#297) takes over at "now".
-    # Capacities must equal DEMO_ROOMS in raspberry/config.py: the traffic
+    # Capacities must equal the MOCK_ROOMS the demo sender runs with
+    # (docker/local/mock/demo_pis.py documents the invocation): the traffic
     # light divides count by the Postgres capacity.
     {"id": "016E", "name": "Raum 016E", "building": "Hauptgebäude", "floor": 0,
      "capacity": 50, "profile": "standard"},
