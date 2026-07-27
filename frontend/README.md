@@ -1,73 +1,82 @@
-# React + TypeScript + Vite
+# OccuPi — frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+The React single-page app: a dashboard with live occupancy per room, an analytics
+view with history and week pattern, and an admin panel for rooms and the sensor
+registry. It reads the backend over REST and subscribes to `/topic/occupancy` for
+live counts.
 
-Currently, two official plugins are available:
+React 19 + Vite 8 + TypeScript, Tailwind CSS for styling, Zustand for state,
+Recharts for the charts.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## Run it
 
-## React Compiler
+The frontend is part of both Docker stacks, so `cd docker/local && docker compose
+up -d --build` already serves it on http://localhost:3000. Run it from source only
+when you want hot reload:
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+cp .env.example .env      # localhost:8080/api and localhost:8180 (Keycloak)
+npm ci
+npm run dev               # http://localhost:5173
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+That expects a backend and a Keycloak. The quickest way to get both is to start
+them from the local stack:
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+cd ../docker/local && docker compose up -d backend keycloak influxdb postgres mock
 ```
+
+The local Keycloak realm allows `:5173` as an origin, so login works from the dev
+server too.
+
+## Scripts
+
+| Command | Does |
+|---|---|
+| `npm run dev` | Vite dev server with hot reload on `:5173` |
+| `npm run build` | Type-check with `tsc -b`, then bundle to `dist/` |
+| `npm run lint` | ESLint over the project |
+| `npm run preview` | Serve the built bundle locally |
+
+Run `npm run lint` and `npm run build` before opening a pull request; CI runs both
+and a failure blocks the merge.
+
+## Configuration
+
+`VITE_*` values are read from `.env` and **inlined at build time**, so a bundle is
+tied to the URLs it was built with. That is why the server builds the frontend from
+source instead of pulling a prebuilt image
+([ADR 0004](../docs/adr/0004-server-builds-from-source.md)), deriving these values
+from `PUBLIC_HOST` in `docker/server/.env`.
+
+| Variable | Meaning |
+|---|---|
+| `VITE_API_URL` | Base URL of the backend REST API |
+| `VITE_KEYCLOAK_URL` | Keycloak base URL |
+| `VITE_KEYCLOAK_REALM` | Realm name (`occupi`) |
+| `VITE_KEYCLOAK_CLIENT_ID` | Client id (`occupi-frontend`) |
+
+All four have localhost defaults in the code, so `npm run dev` works against the
+local stack without a `.env`.
+
+## Layout
+
+```
+src/
+├── pages/       Login, Dashboard, Analytics, AdminPanel
+├── components/  charts, room cards, filters, navigation, route guards
+├── hooks/       Zustand stores (auth, rooms, dashboard) + the WebSocket hook
+├── layouts/     MainLayout (navbar + sidebar shell)
+├── types/       shared API types
+└── utils/       Axios client, mock fallback data
+```
+
+The Axios client stamps the Keycloak JWT onto every request and redirects to
+`/login` on a `401`.
+
+## More
+
+The root [`README.md`](../README.md) covers the whole system and its configuration;
+the [wiki](https://github.com/Elhan-Salaji/OccuPi/wiki) has the architecture, the
+API reference and the contribution guide.
