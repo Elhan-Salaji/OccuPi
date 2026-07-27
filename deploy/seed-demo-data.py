@@ -242,7 +242,7 @@ def preflight():
     args = run(["docker", "inspect", "--format", "{{json .Args}}", INFLUX_CONTAINER]).stdout
     if "--query-file-limit" not in args:
         sys.exit("InfluxDB runs without --query-file-limit (#294). Recreate it first:\n"
-                 "  docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d influxdb")
+                 "  cd /home/Elhan/Occupi/docker/server && docker compose up -d influxdb")
     if influx_http("GET", "/health") != "200":
         sys.exit("InfluxDB health check failed -- aborting.")
 

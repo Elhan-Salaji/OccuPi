@@ -85,5 +85,5 @@ Räume, die Daten gemeldet haben.
 ## Zurücksetzen
 
 `docker compose down` stoppt (Daten bleiben), `docker compose down -v` setzt
-alles zurück — nächster Start seedet frisch. Dieser Stack hat eigene Volumes
-und berührt die alte `docker/`-Compose-Struktur nicht.
+alles zurück, der nächste Start seedet frisch. Die Volumes gehören allein diesem
+Stack; der Server-Stack hat seine eigenen.

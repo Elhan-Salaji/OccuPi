@@ -2,7 +2,7 @@
 
 Host-side bits that live outside Docker Compose: the Nginx reverse proxy
 ([`nginx/occupi.conf`](nginx/occupi.conf)), the **automatic deploy** timer and the
-**migration runbook** for moving the VM onto `docker/server/`.
+**demo data seed**.
 
 ## Automatic deploy (systemd timer)
 
@@ -66,9 +66,8 @@ sich nichts** — gleicher Timer, gleicher Rhythmus, gleiche Befehle
 | Rollback | vorheriges Image re-taggen (Sekunden) | Reset auf letzten guten Commit + Rebuild (Minuten) |
 | Merker für „kaputt" | Bad-Digest-Datei | Bad-Commit-Datei |
 
-Da das Skript direkt aus dem Repo läuft, aktiviert sich die neue Logik von
-selbst mit dem `git pull` des Cutovers — die Units müssen nicht neu kopiert
-werden.
+Da das Skript direkt aus dem Repo läuft, war beim Cutover nichts zu kopieren:
+Der `git pull` brachte die neue Logik mit, die Units blieben unangetastet.
 
 ### Install (one-time, on the server, as root)
 
@@ -115,94 +114,6 @@ systemctl disable --now occupi-autodeploy.timer
 rm -f /etc/systemd/system/occupi-autodeploy.{service,timer}
 systemctl daemon-reload
 ```
-
-## Migrations-Runbook: VM auf docker/server umziehen
-
-Einmaliger Cutover von der alten Struktur (base + prod-Overlay, GHCR-Images) auf
-`docker/server/`. Kernpunkt: `docker/server/compose.yml` adoptiert die
-**bestehenden** Volumes (`docker_influxdb3-data`, `docker_postgres-data`) extern —
-es werden null Bytes kopiert, die Historie bleibt vollständig. Geplante Downtime:
-wenige Minuten plus der erste Build.
-
-**Niemals alten und neuen Stack gleichzeitig starten** — gleiche Volumes, gleiche
-Containernamen.
-
-1. **Automatik einfrieren** (sonst führt der Timer den Cutover unbeaufsichtigt
-   aus, sobald das neue Skript auf `develop` liegt):
-
-   ```bash
-   systemctl stop occupi-autodeploy.timer occupi-autodeploy.service
-   ```
-
-2. **Backups:**
-
-   ```bash
-   docker exec occupi-postgres pg_dumpall -U occupi > ~/backup-$(date +%F).sql
-   docker run --rm -v docker_influxdb3-data:/v -v ~/:/bk alpine \
-     tar czf /bk/influx-backup-$(date +%F).tgz /v
-   ```
-
-3. **Swap anlegen** (falls noch nicht vorhanden — siehe Kasten oben; ohne Swap
-   kann der erste Build die VM abschießen, das ist #140 in neu).
-
-4. **Repo aktualisieren:** `git -C /home/Elhan/Occupi pull --ff-only`
-
-5. **`docker/server/.env` füllen:** `cp docker/server/.env.example docker/server/.env`,
-   Werte aus der alten `docker/.env` übernehmen (`POSTGRES_PASSWORD`,
-   `KEYCLOAK_ADMIN_PASSWORD`; `KC_HOSTNAME` heißt jetzt `PUBLIC_HOST`), Neues
-   setzen (`GRAFANA_ADMIN_*`, `CORS_ALLOWED_ORIGINS`); `INFLUXDB_TOKEN` bleibt
-   vorerst der Platzhalter. `docker compose config` in `docker/server/` meldet
-   jede fehlende Pflichtvariable.
-
-6. **Alten Stack stoppen** (niemals `down -v` — die Volumes gehören jetzt dem
-   neuen Stack):
-
-   ```bash
-   cd /home/Elhan/Occupi/docker
-   docker compose -f docker-compose.yml -f docker-compose.prod.yml down
-   ```
-
-7. **InfluxDB-Token-Bootstrap** (Influx läuft ab jetzt MIT Auth):
-
-   ```bash
-   cd /home/Elhan/Occupi/docker/server
-   docker compose up -d influxdb          # Healthcheck bleibt rot, ist ok
-   docker exec occupi-influxdb3 influxdb3 create token --admin
-   # apiv3_...-Token in .env als INFLUXDB_TOKEN eintragen
-   ```
-
-8. **Stack hochziehen:** `docker compose up -d --build` (erster Build dauert
-   einige Minuten; Projekt `occupi`, externe Volumes docken an).
-
-9. **Verifizieren:** Startseite, `https://<host>/api/rooms` (Raumliste intakt),
-   Login über `/auth`, `/ws`-Verbindung des Pi (Reconnect-Queue des Senders
-   überbrückt den Neustart), History-Chart eines Bestandsraums (beweist das
-   Influx-Volume), Grafana-Datasource healthy (SSH-Tunnel auf :3001), und in
-   Postgres existiert die `sensors`-Tabelle samt FK (`\d sensors`).
-
-10. **Keycloak-Hinweis:** Der Realm existiert bereits in Postgres —
-    `realm-server.json` wird auf der VM nie importiert; Realm-Änderungen laufen
-    weiter über die Admin-Console.
-
-11. **Laufender Pi — null Datenlücke:** Der Sender schickt unverändert
-    `{roomId, sensorId, …}`; das Backend liest das als Claim + Geräte-ID, der
-    Raum existiert, die Daten fließen weiter. Beim späteren Umzug des Pi auf
-    `raspberry/docker/` **dieselbe `SENSOR_ID` (`sensor-01`) wiederverwenden**,
-    damit Registry- und Metrik-Historie zusammenbleiben.
-
-12. **Automatik wieder aktivieren:**
-
-    ```bash
-    systemctl start occupi-autodeploy.timer
-    journalctl -u occupi-autodeploy -f     # einen grünen Lauf abwarten
-    ```
-
-**Rollback:** Solange die alten Compose-Dateien existieren (`docker/docker-compose*.yml`,
-Löschung erst nach Soak-Phase): neuen Stack `down` (ohne `-v`), alten mit
-`-f docker-compose.yml -f docker-compose.prod.yml up -d` starten — die Daten
-liegen in denselben Volumes. Influx-Auth-Probleme: übergangsweise
-`--without-auth` in `docker/server/compose.yml` re-aktivieren und forward fixen.
-Postgres-Notfall: Dump aus Schritt 2 einspielen.
 
 ## Demo data seed
 
