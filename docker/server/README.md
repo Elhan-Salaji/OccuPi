@@ -15,19 +15,19 @@ Backend und Frontend bauen aus dem Repo-Stand; die `VITE_*`-URLs entstehen aus
 `PUBLIC_HOST` in der `.env`. Öffentlich ist nur nginx (`deploy/nginx/occupi.conf`);
 alle Container-Ports binden an 127.0.0.1.
 
-## Bestands-VM vs. frischer Server
+## Volumes: die Namen stammen aus der alten Struktur
 
-- **Bestands-VM (occupi.mi.hdm-stuttgart.de):** Die Volumes des alten
-  `docker/`-Stacks werden extern adoptiert (`docker_influxdb3-data`,
-  `docker_postgres-data`) — der Umzug kostet null Bytes. Den kompletten Ablauf
-  inklusive Backup, Timer-Stopp und Rollback beschreibt das Runbook in
-  `deploy/README.md`. Wichtig: Alten und neuen Stack nie gleichzeitig starten
-  (gleiche Volumes, gleiche Containernamen).
-- **Frischer Server:** die zwei Volumes einmalig anlegen, dann normal starten:
+InfluxDB und Postgres hängen extern an `docker_influxdb3-data` und
+`docker_postgres-data`. Angelegt hat diese Namen der frühere `docker/`-Stack;
+beim Umzug auf `docker/server/` haben wir sie übernommen statt zu kopieren,
+deshalb ist die Historie der Bestands-VM lückenlos.
 
-  ```bash
-  docker volume create docker_influxdb3-data docker_postgres-data
-  ```
+Auf einem frischen Server existieren die beiden Volumes noch nicht. Einmalig
+anlegen, dann normal starten:
+
+```bash
+docker volume create docker_influxdb3-data docker_postgres-data
+```
 
 ## InfluxDB-Token-Bootstrap (einmalig)
 

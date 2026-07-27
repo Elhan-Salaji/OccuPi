@@ -4,10 +4,10 @@ Room-occupancy monitoring for HdM Stuttgart. A ceiling-mounted TI IWR6843 mmWave
 radar counts people in a room without cameras or personal data, streams the headcount
 to a backend, and a web dashboard shows current and historical occupancy per room.
 
-Everything runs in Docker, split by decision instead of by overlay: `docker/local/`
-starts the complete stack out of the box (including a simulated Pi fleet — no
-hardware, no clicks), `docker/server/` is the deliberately configured deployment,
-and `raspberry/docker/` runs the real sensor on a Pi.
+Everything runs in Docker, one directory per decision: `docker/local/` starts the
+complete stack out of the box (including a simulated Pi fleet, no hardware and no
+clicks), `docker/server/` is the deliberately configured deployment, and
+`raspberry/docker/` runs the real sensor on a Pi.
 
 ---
 
@@ -174,8 +174,7 @@ public. Setup, token bootstrap and the fresh-install path:
 Deploys are automatic: a systemd timer runs `deploy/auto-deploy.sh` every 5
 minutes — new commit on `develop` → serial build → health-gated restart →
 rollback to the last good commit on failure. Operating it, the swap-file
-prerequisite and the **migration runbook** (moving the VM from the legacy compose
-files, zero data loss): [`deploy/README.md`](deploy/README.md).
+prerequisite and the demo data seed: [`deploy/README.md`](deploy/README.md).
 
 ## Authentication and Grafana
 
