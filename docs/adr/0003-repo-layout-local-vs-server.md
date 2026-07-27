@@ -1,7 +1,8 @@
 # 0003 — Repo-Layout: eine Entscheidung, zwei Docker-Ordner
 
 **Status:** Akzeptiert (#313/#314, Juli 2026) — löst die Struktur
-base + override + prod-Overlay ab (Alt-Dateien fallen nach der Soak-Phase, #318).
+base + override + prod-Overlay ab; nach der Soak-Phase auf der VM sind deren
+Dateien gelöscht (#318).
 
 **Kontext.** Wer das Repo klonte, musste Mock-Sender separat starten, Räume von
 Hand anlegen, Grafana manuell verdrahten und für den Server ein Overlay-Geflecht
@@ -31,6 +32,7 @@ keine Overlays, keine verstreuten `.env`-Dateien.
   `docker volume create` an.
 
 **Konsequenzen.** Frischer Clone → drei Befehle → Dashboard mit Live-Daten pro
-Raum. Alter und neuer Server-Stack teilen Volumes und Containernamen und dürfen
-nie gleichzeitig laufen; bis zur Löschung der Alt-Dateien sind sie das
-dokumentierte Rollback-Netz (Runbook in `deploy/README.md`).
+Raum. Ein Compose-Rollback auf die alte Struktur gibt es seit #318 nicht mehr:
+Wer zurück muss, setzt den Server-Stack auf einen früheren Commit und baut neu,
+so wie es auch die Deploy-Automatik tut. Die Volume-Namen tragen weiter das
+Präfix des alten Projekts, sonst verlöre die Bestands-VM ihre Historie.
