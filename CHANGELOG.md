@@ -91,6 +91,16 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   live occupancy for room 137 (#201).
 
 ### Removed
+- The legacy compose structure: `docker/docker-compose.yml` with its `override` and
+  `prod` overlays, `docker/.env.example`, the realm file in `docker/keycloak/` and
+  the init script in `docker/postgres/` (the deleted base was their only consumer;
+  `docker/shared/postgres-init/` serves both stacks now), plus the orphaned
+  `frontend/grafana/compose.yml`. The server has run on `docker/server/` since the
+  cutover, so all these files still held was a rollback path nobody needs.
+  `docker/README.md` becomes an index over the two stacks and keeps the InfluxDB
+  numbers they share (the `--query-file-limit` arithmetic, the resource cap); the
+  migration runbook in `deploy/README.md` goes with the files its steps named, and
+  the volume-adoption note it carried moved to `docker/server/README.md` (#318).
 - `.github/workflows/images.yml` (GHCR image publishing): with both stacks building
   from source there is no consumer left for registry images, and keeping a publisher
   nobody deploys invites digest drift. Decision and the rejected runtime-config
