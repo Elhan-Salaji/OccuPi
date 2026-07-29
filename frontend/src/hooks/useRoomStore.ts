@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import type { Room } from '../types/room';
 
-// Hier definieren wir, was unser Speicher alles können muss
+// What the store has to be able to do
 interface RoomState {
     rooms: Room[];
     setRooms: (rooms: Room[]) => void;
@@ -13,12 +13,12 @@ interface RoomState {
 }
 
 export const useRoomStore = create<RoomState>((set) => ({
-    rooms: [], // Liste anfangs leer
+    rooms: [], // the list starts out empty
 
-    // Funktion, um alle Räume auf einmal zu laden
+    // Load all rooms at once
     setRooms: (rooms) => set({ rooms }),
 
-    // Funktion, um nur die Belegung eines einzelnen Raums zu ändern
+    // Change the occupancy of a single room only
     updateRoom: (roomId, count) => set((state) => ({
         rooms: state.rooms.map((room) => {
             if (room.roomId !== roomId) return room;

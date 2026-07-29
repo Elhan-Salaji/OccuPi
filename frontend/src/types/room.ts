@@ -1,4 +1,4 @@
-//Detaillierter als eine Zahl, was passiert im Moment
+// More detail than a single number: what is happening right now
 export interface Occupancy{
     roomId: string;
     count: number;

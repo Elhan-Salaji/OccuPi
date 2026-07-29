@@ -3,18 +3,18 @@ from config import ROOM_ID, SENSOR_ID
 
 def map_to_occupancy(frame: dict) -> dict:
     """
-    Mapped einen geparsten mmWave-Frame auf das OccupancyData-Modell.
+    Maps a parsed mmWave frame onto the OccupancyData model.
     Args:
-        frame: Dict mit mindestens 'numDetectedTracks' und 'frameNum'
+        frame: dict with at least 'numDetectedTracks' and 'frameNum'
 
     Returns:
-        OccupancyData als Dict (JSON-serialisierbar)
+        OccupancyData as a dict (JSON-serializable)
     """
     return {
-        "roomId":     frame.get("roomId", ROOM_ID),  # Mock/Demo setzen pro Raum eine ID; Real-Pfad nutzt ROOM_ID
-        "sensorId":   frame.get("sensorId", SENSOR_ID),  # Demo setzt pro Raum einen Sensor; sonst SENSOR_ID
+        "roomId":     frame.get("roomId", ROOM_ID),  # mock/demo set an id per room; the real path uses ROOM_ID
+        "sensorId":   frame.get("sensorId", SENSOR_ID),  # demo sets a sensor per room; otherwise SENSOR_ID
 
         "count":      frame.get("numDetectedTracks", 0),
-        "confidence": frame.get("confidence", 1.0),  # Mock liefert echte Werte; Real-Pfad bleibt 1.0 bis echte Logik existiert
+        "confidence": frame.get("confidence", 1.0),  # mock delivers real values; the real path stays 1.0 until the logic exists
         "timestamp":  datetime.now(timezone.utc).isoformat(),
     }
