@@ -8,19 +8,18 @@
 #   2. fast-forwards the repo (compose files, sources and this script itself),
 #   3. builds backend and frontend from source, ONE AT A TIME (the single-core
 #      host must never run two builds at once; a swap file is required — an
-#      unswapped build killed this VM once, see #140 and deploy/README.md),
+#      unswapped build killed this VM once, see #140 and the root README),
 #   4. recreates the two services and health-checks them; on failure it ROLLS
 #      BACK to the last good commit (reset + rebuild) and records the bad
 #      commit so it is not retried until the branch moves on,
 #   5. prunes old images to reclaim disk.
 #
 # Infra (postgres / keycloak / influxdb / grafana) is intentionally NOT touched
-# here — pinned versions, updated manually. See deploy/README.md.
+# here — pinned versions, updated manually. See the root README.
 #
 # Runs as root via systemd. Logs go to journald:  journalctl -u occupi-autodeploy
 #
-# The stack lives in docker/server (single compose file + .env); the legacy
-# GHCR-pull flow this replaced is described in deploy/README.md.
+# The stack lives in docker/server (single compose file + .env).
 
 set -euo pipefail
 

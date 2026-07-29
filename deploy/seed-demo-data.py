@@ -4,7 +4,7 @@
 Rewrites the InfluxDB `occupancy` table with eight weeks of shaped demo
 history, upserts the demo rooms in Postgres and restarts the backend so it
 recreates its InfluxDB caches (#294). One room per dashboard edge case, see
-issue #300 and deploy/README.md ("Seeding demo data").
+issue #300 and the root README ("Demo data seed").
 
 The script is meant to be re-run before each demo: the shaped "last values"
 age out of the 7-day latest-lookback window, and a run always drops and
