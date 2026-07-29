@@ -91,6 +91,17 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   live occupancy for room 137 (#201).
 
 ### Removed
+- Every documentation file except the root `README.md`: `docs/adr/` (the four
+  repo-wide ADRs), the per-part logs `backend/docs/decisions.md` and
+  `raspberry/docs/` (hardware, radar physics, the TLV data format, the chirp config
+  reference, the mounting decision), and the six per-directory READMEs under
+  `docker/`, `docker/local/`, `docker/server/`, `deploy/`, `frontend/` and
+  `raspberry/`. The wiki already carries all of it, and two copies of the same
+  decision drift apart. What the sub-READMEs held operationally moved into the root
+  README, so the local stack, the real Pi, the frontend build, the server setup
+  including the InfluxDB token bootstrap, auto-deploy and the demo seed are all in
+  one file now. `CONTRIBUTING.md` and the comments in `deploy/` point at the wiki
+  and the README instead of at deleted paths (#341).
 - The legacy compose structure: `docker/docker-compose.yml` with its `override` and
   `prod` overlays, `docker/.env.example`, the realm file in `docker/keycloak/` and
   the init script in `docker/postgres/` (the deleted base was their only consumer;
@@ -107,6 +118,13 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   alternative are recorded in ADR 0004 (#321).
 
 ### Changed
+- The repo speaks English throughout: the commit checker's CI output, the docstring
+  and comments in `raspberry/sender/processor.py`, and the last German comments in
+  the frontend (`useRoomStore.ts`, `types/room.ts`, `Login.tsx`). The README and the
+  Pi's `.env.example` now name the sensor status the API actually returns
+  (`UNRESOLVED`) instead of a German word no screen ever showed. The frontend's
+  user-facing strings stay German — that is a product decision, not a docs one
+  (#341).
 - Repo-wide decisions now live in `docs/adr/` (configuration via env, sensor
   claim/override mapping, local-vs-server layout incl. volume adoption, server
   builds from source); the per-part logs in `backend/docs/` and `raspberry/docs/`

@@ -1,4 +1,4 @@
-# Runs occupi-autodeploy.service periodically. Install: see deploy/README.md.
+# Runs occupi-autodeploy.service periodically. Install: see the root README.
 [Unit]
 Description=Run OccuPi auto-deploy every 5 minutes
 

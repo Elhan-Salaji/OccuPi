@@ -31,8 +31,8 @@ exception — the commit check in CI enforces part of them automatically.
 
 - Maintain the CHANGELOG (`Keep a Changelog`) with each PR: user-visible
   changes go under `[Unreleased]` in the matching category.
-- Architecture decisions go to `docs/adr/` as ADRs; the part-specific decision
-  logs live in `backend/docs/` and `raspberry/docs/`.
+- Architecture decisions go to the wiki, on the Architecture-Decision-Records page.
+  The repo carries one documentation file, the root `README.md`.
 - Secrets stay in git-ignored `.env` files (`docker/server/.env`,
   `raspberry/docker/.env`); `docker/local/.env` is committed on purpose and
   contains none.
