@@ -77,6 +77,10 @@ reads over REST and also gets live pushes over WebSocket.
 Decisions live in [`docs/adr/`](docs/adr/); the per-part logs
 (`backend/docs/decisions.md`, `raspberry/docs/decisions.md`) link there.
 
+The [**project wiki**](https://github.com/Elhan-Salaji/OccuPi/wiki) carries the wider
+documentation: architecture and data model, the API reference, hardware and sensor
+setup, the requirements, testing, deployment and the FAQ.
+
 ## Repository layout
 
 ```
