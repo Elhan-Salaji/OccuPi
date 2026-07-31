@@ -76,3 +76,15 @@ export interface RoomResponse {
     floor: number;
     capacity: number;
 }
+
+// POST /api/rooms/import
+export interface RoomImportError {
+    row: number; // 1-based line in the CSV, the header being line 1
+    message: string;
+}
+
+export interface RoomImportResult {
+    created: number;
+    updated: number;
+    errors: RoomImportError[];
+}

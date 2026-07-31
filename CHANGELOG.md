@@ -8,6 +8,12 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 ### Added
+- CSV import and export buttons next to the room table in the Admin Panel. Export
+  downloads the current room list as `rooms.csv`; import uploads a file to the
+  bulk endpoint and reports how many rooms were created and updated. A rejected
+  file is listed row by row with the reason the backend gave, and since the import
+  is all-or-nothing the table stays untouched in that case. First upload/download
+  UI in the frontend, so it sets the pattern for later CSV features (#345).
 - `docker/server/`: the deliberately configured counterpart to `docker/local/`. One
   `.env.example` that must be filled completely — the compose file fail-fasts with
   `${VAR:?}` on every missing required value (Postgres, Keycloak admin, Grafana
