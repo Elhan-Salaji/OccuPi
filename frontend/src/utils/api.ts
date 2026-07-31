@@ -1,6 +1,6 @@
 import axios from 'axios';
 import { useAuthStore, TOKEN_ENDPOINT, CLIENT_ID } from "../hooks/useAuthStore";
-import type { ForecastResponse, HistoryResponse, WeekPatternResponse, RoomResponse } from "../types/room";
+import type { ForecastResponse, HistoryResponse, WeekPatternResponse, RoomResponse, RoomImportResult } from "../types/room";
 import type { MetricsResponse } from "../types/metrics";
 
 const api = axios.create({
@@ -100,6 +100,22 @@ export function updateRoom(id: string, data: {roomId: string; name: string; buil
 
 export function deleteRoom(id: string) {
     return api.delete(`/rooms/${id}`)
+}
+
+
+export function exportRoomsCsv(): Promise<Blob> {
+    return api.get<Blob>('/rooms/export', { responseType: 'blob' }).then(res => res.data);
+}
+
+export function importRoomsCsv(file: File): Promise<RoomImportResult> {
+    const body = new FormData();
+    body.append('file', file);
+    // The instance defaults to application/json, and axios serialises FormData to
+    // JSON whenever the content type says so. Overriding it here keeps the body as
+    // FormData; the browser then replaces the header with the multipart boundary.
+    return api.post<RoomImportResult>('/rooms/import', body, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+    }).then(res => res.data);
 }
 
 export function fetchMetrics(): Promise<MetricsResponse[]> {

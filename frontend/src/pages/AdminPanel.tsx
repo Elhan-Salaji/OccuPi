@@ -1,9 +1,9 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef, type ChangeEvent } from 'react';
 import { Pencil, Trash2 } from 'lucide-react';
 import api from '../utils/api';
-import { createRoom, updateRoom, deleteRoom} from "../utils/api";
+import { createRoom, updateRoom, deleteRoom, exportRoomsCsv, importRoomsCsv } from "../utils/api";
 import { MetricsSection} from "../components/MetricsSection";
-import type { RoomResponse } from '../types/room';
+import type { RoomResponse, RoomImportError, RoomImportResult } from '../types/room';
 
 const emptyForm = { roomId: '', name: '', building: '', floor: 0, capacity: 0};
 
@@ -17,6 +17,11 @@ const AdminPanel = () => {
 
     const [initialized, setInitialized] = useState(false);
 
+    const [importing, setImporting] = useState(false);
+    const [importResult, setImportResult] = useState<RoomImportResult | null>(null);
+    const [importErrors, setImportErrors] = useState<RoomImportError[]>([]);
+    const fileInputRef = useRef<HTMLInputElement>(null);
+
     const refreshRooms = useCallback (async () => {
         try {
             const res = await api.get<RoomResponse[]>('/rooms');
@@ -29,6 +34,52 @@ const AdminPanel = () => {
             setLoading(false);
         }
     }, []);
+
+
+    const handleExport = async () => {
+        try {
+            const blob = await exportRoomsCsv();
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = 'rooms.csv';
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            URL.revokeObjectURL(url);
+            setError(null);
+        } catch {
+            setError('Fehler beim Exportieren.');
+        }
+    };
+
+    const handleImport = async (e: ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        // Clear the input so picking the same file twice still fires onChange
+        e.target.value = '';
+        if (!file) return;
+
+        setImporting(true);
+        setImportResult(null);
+        setImportErrors([]);
+        setError(null);
+
+        try {
+            const result = await importRoomsCsv(file);
+            setImportResult(result);
+            await refreshRooms();
+        } catch (err: unknown) {
+            const response = (err as { response?: { status?: number; data?: RoomImportResult }})?.response;
+            // 400 carries the per-row reasons; the import is all-or-nothing, so the table is unchanged
+            if (response?.status === 400 && response.data?.errors?.length) {
+                setImportErrors(response.data.errors);
+            } else {
+                setError(response?.status === 403 ? 'Keine Berechtigung.' : 'Fehler beim Importieren.');
+            }
+        } finally {
+            setImporting(false);
+        }
+    };
 
     if (!initialized) {
         setInitialized(true);
@@ -152,7 +203,40 @@ const AdminPanel = () => {
 
             {/* Room Table */}
             <section className="bg-white rounded-xl shadow p-6">
-                <h2 className="text-xl font-semibold text-gray-900 mb-4">Rooms</h2>
+                <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+                    <h2 className="text-xl font-semibold text-gray-900">Rooms</h2>
+                    <div className="flex gap-2">
+                        <button type="button" onClick={handleExport}
+                                className="bg-gray-100 text-gray-700 px-4 py-2 rounded-lg text-sm hover:bg-gray-200">
+                            CSV exportieren
+                        </button>
+                        <button type="button" onClick={() => fileInputRef.current?.click()} disabled={importing}
+                                className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700 disabled:opacity-50">
+                            {importing ? 'Importiere…' : 'CSV importieren'}
+                        </button>
+                        <input ref={fileInputRef} type="file" accept=".csv,text/csv"
+                               onChange={handleImport} className="hidden" />
+                    </div>
+                </div>
+
+                {importResult && (
+                    <p className="mb-4 text-sm text-green-700">
+                        Import erfolgreich: {importResult.created} angelegt, {importResult.updated} aktualisiert.
+                    </p>
+                )}
+
+                {importErrors.length > 0 && (
+                    <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-4">
+                        <p className="text-sm font-medium text-red-700 mb-2">
+                            Import abgebrochen, nichts gespeichert — {importErrors.length} fehlerhafte Zeile(n):
+                        </p>
+                        <ul className="list-disc list-inside space-y-1 text-sm text-red-700">
+                            {importErrors.map((e, i) => (
+                                <li key={`${e.row}-${i}`}>Zeile {e.row}: {e.message}</li>
+                            ))}
+                        </ul>
+                    </div>
+                )}
                 <div className="overflow-x-auto">
                 <table className="w-full text-left">
                     <thead>
