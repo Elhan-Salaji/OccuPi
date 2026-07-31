@@ -7,7 +7,18 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-07-31
+
+Second full release. Adds bulk CSV import/export for rooms, folds the
+per-directory READMEs and decision logs into the root README and the wiki, and
+carries the accumulated fixes and hardening since v0.1.0.
+
 ### Added
+- `POST /api/rooms/import` and `GET /api/rooms/export` for bulk CSV room
+  management: export streams the current room list as `rooms.csv`, import
+  upserts by `roomId` and is all-or-nothing — a single invalid row rejects the
+  whole file with `400` and a per-row reason, so the table is never left
+  half-written. Admin-only, like the other room mutations (#343).
 - CSV import and export buttons next to the room table in the Admin Panel. Export
   downloads the current room list as `rooms.csv`; import uploads a file to the
   bulk endpoint and reports how many rooms were created and updated. A rejected
