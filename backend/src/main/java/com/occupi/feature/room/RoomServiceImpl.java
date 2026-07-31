@@ -1,5 +1,6 @@
 package com.occupi.feature.room;
 
+import com.occupi.feature.room.dto.RoomImportResult;
 import com.occupi.feature.room.dto.RoomRequest;
 import com.occupi.feature.room.dto.RoomResponse;
 import com.occupi.feature.sensor.Sensor;
@@ -7,6 +8,7 @@ import com.occupi.feature.sensor.SensorRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Optional;
@@ -81,6 +83,29 @@ public class RoomServiceImpl implements RoomService {
         }
         roomRepository.deleteById(roomId);
         log.info("Deleted room: {}", roomId);
+    }
+
+    @Override
+    @Transactional
+    public RoomImportResult importRooms(List<RoomRequest> rooms) {
+        int created = 0;
+        int updated = 0;
+        for (RoomRequest request : rooms) {
+            if (roomRepository.existsById(request.roomId())) {
+                updated++;
+            } else {
+                created++;
+            }
+            roomRepository.save(Room.builder()
+                    .roomId(request.roomId())
+                    .name(request.name())
+                    .building(request.building())
+                    .floor(request.floor())
+                    .capacity(request.capacity())
+                    .build());
+        }
+        log.info("Imported rooms: {} created, {} updated", created, updated);
+        return new RoomImportResult(created, updated, List.of());
     }
 
     private RoomResponse toResponse(Room room) {
