@@ -18,7 +18,7 @@ export const MainLayout = () => {
 
                 <Navbar onMenuClick={() => setMobileNavOpen(true)} />
 
-                <main className="flex-1 p-6 md:p-8 overflow-x-hidden overflow-y-auto"> {/**/}
+                <main className="flex-1 p-6 md:p-8 overflow-x-hidden overflow-y-auto">
 
                     <Outlet />
                 </main>

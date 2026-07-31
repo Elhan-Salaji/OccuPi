@@ -120,11 +120,14 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ### Changed
 - The repo speaks English throughout: the commit checker's CI output, the docstring
   and comments in `raspberry/sender/processor.py`, and the last German comments in
-  the frontend (`useRoomStore.ts`, `types/room.ts`, `Login.tsx`). The README and the
-  Pi's `.env.example` now name the sensor status the API actually returns
-  (`UNRESOLVED`) instead of a German word no screen ever showed. The frontend's
-  user-facing strings stay German — that is a product decision, not a docs one
-  (#341).
+  the frontend (`useRoomStore.ts`, `types/room.ts`, `Login.tsx`,
+  `WeekPatternHeatmap.tsx`) — including the one German `console.error` in
+  `useFetchRooms.ts`, which is dev-facing log output rather than a UI string, and a
+  handful of machine-translation artefacts that read as English but named the wrong
+  thing. The README and the Pi's `.env.example` now name the sensor status the API
+  actually returns (`UNRESOLVED`) instead of a German word no screen ever showed.
+  The frontend's user-facing strings stay German — that is a product decision, not
+  a docs one (#341).
 - Repo-wide decisions now live in `docs/adr/` (configuration via env, sensor
   claim/override mapping, local-vs-server layout incl. volume adoption, server
   builds from source); the per-part logs in `backend/docs/` and `raspberry/docs/`

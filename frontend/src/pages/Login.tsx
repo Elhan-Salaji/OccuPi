@@ -10,7 +10,7 @@ export const Login = () => {
     const login = useAuthStore((state) => state.login);
     const navigate = useNavigate();
 
-    // Task: Form validation & Submit handling
+    // Form validation & Submit handling
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setError('');

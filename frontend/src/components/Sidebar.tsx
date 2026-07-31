@@ -56,7 +56,7 @@ export const Sidebar = ({ mobileOpen, onMobileClose }: { mobileOpen: boolean; on
                 {isCollapsed ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />}
             </button>
 
-            {/* logo at the top, TO DO: change logo*/}
+            {/* logo at the top, TO DO: placeholder until the real one lands (#215)*/}
             <div className="h-20 flex items-center justify-center mb-6 border-b border-[#1F2937] overflow-hidden px-2">
                 <Link to="/dashboard" className="text-xl font-bold text-white hover:opacity-80 transition-opacity cursor-pointer truncate">
                     {/* collapsed: OP - otherwise: OccuPi */}

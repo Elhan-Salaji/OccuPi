@@ -48,7 +48,7 @@ export const RoomFilters: React.FC<RoomFiltersProps> =
         };
 
         const toggleFloor = (floor: string) => {
-            //if building is already selected, remove it, else add it
+            //if floor is already selected, remove it, else add it
             if (selectedFloors.includes(floor)) {
                 setSelectedFloors(selectedFloors.filter((b) => b !== floor));
             } else {
@@ -81,7 +81,7 @@ export const RoomFilters: React.FC<RoomFiltersProps> =
                                 <button key={building}
                                         onClick={() => toggleBuildings(building)}
                                         className={`px-4 py-1.5 text-sm rounded-xl transition-all duration-200 border ${isSelected
-                                            ? 'bg-[#111827] border-[#111827] text-white shadow-sm' // dark blue like the website - test
+                                            ? 'bg-[#111827] border-[#111827] text-white shadow-sm' // dark blue, matches the site background
                                             : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'
                                         }`}
                                 >
@@ -110,7 +110,7 @@ export const RoomFilters: React.FC<RoomFiltersProps> =
                                         onClick={() => toggleFloor(floor)}
                                         className={`px-4 py-1.5 text-sm rounded-xl transition-all duration-200 border ${
                                             isSelected
-                                                ? 'bg-[#111827] border-[#111827] text-white shadow-sm' // test
+                                                ? 'bg-[#111827] border-[#111827] text-white shadow-sm'
                                                 : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'
                                         }`}
                                     >
