@@ -1,6 +1,7 @@
 package com.occupi.security;
 
 import com.occupi.feature.room.RoomController;
+import com.occupi.feature.room.RoomCsvService;
 import com.occupi.feature.room.RoomService;
 import com.occupi.feature.room.dto.RoomResponse;
 import org.junit.jupiter.api.DisplayName;
@@ -8,6 +9,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.test.context.ActiveProfiles;
@@ -19,6 +21,7 @@ import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -38,6 +41,9 @@ class SecurityConfigTest {
 
     @MockitoBean
     private RoomService roomService;
+
+    @MockitoBean
+    private RoomCsvService roomCsvService;
 
     @MockitoBean
     private JwtDecoder jwtDecoder;
@@ -115,5 +121,24 @@ class SecurityConfigTest {
         mvc.perform(delete("/api/rooms/room-1")
                         .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_ADMIN"))))
                 .andExpect(status().isNoContent());
+    }
+
+    @Test
+    @DisplayName("allows a CSV export for any authenticated user")
+    void exportCsv_authenticated_returns200() throws Exception {
+        when(roomCsvService.export(any())).thenReturn("roomId,name,building,floor,capacity\r\n");
+
+        mvc.perform(get("/api/rooms/export").with(jwt()))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    @DisplayName("rejects a CSV import with 403 when the token lacks ADMIN")
+    void importCsv_nonAdmin_returns403() throws Exception {
+        MockMultipartFile file =
+                new MockMultipartFile("file", "rooms.csv", "text/csv", "csv".getBytes());
+
+        mvc.perform(multipart("/api/rooms/import").file(file).with(jwt()))
+                .andExpect(status().isForbidden());
     }
 }

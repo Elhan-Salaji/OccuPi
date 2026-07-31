@@ -22,13 +22,15 @@ class RoomControllerValidationTest {
 
     private MockMvc mockMvc;
     private RoomService roomService;
+    private RoomCsvService roomCsvService;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @BeforeEach
     void setUp() {
         roomService = Mockito.mock(RoomService.class);
+        roomCsvService = Mockito.mock(RoomCsvService.class);
         mockMvc = MockMvcBuilders
-                .standaloneSetup(new RoomController(roomService))
+                .standaloneSetup(new RoomController(roomService, roomCsvService))
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .build();
     }

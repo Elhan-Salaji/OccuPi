@@ -8,6 +8,7 @@ import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
@@ -21,6 +22,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -42,6 +44,9 @@ class RoomControllerMethodSecurityTest {
 
     @MockitoBean
     private RoomService roomService;
+
+    @MockitoBean
+    private RoomCsvService roomCsvService;
 
     // Satisfies OAuth2ResourceServerAutoConfiguration; the test injects auth via jwt().
     @MockitoBean
@@ -78,6 +83,16 @@ class RoomControllerMethodSecurityTest {
     @DisplayName("blocks a delete for a non-admin token (403)")
     void deleteRoom_nonAdmin_returns403() throws Exception {
         mvc.perform(delete("/api/rooms/room-1").with(jwt()))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("blocks a CSV import for a non-admin token (403)")
+    void importCsv_nonAdmin_returns403() throws Exception {
+        MockMultipartFile file =
+                new MockMultipartFile("file", "rooms.csv", "text/csv", "csv".getBytes());
+
+        mvc.perform(multipart("/api/rooms/import").file(file).with(jwt()))
                 .andExpect(status().isForbidden());
     }
 
