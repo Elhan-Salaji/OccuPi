@@ -3,16 +3,22 @@ package com.occupi.feature.chart.dto;
 import java.time.Instant;
 
 /**
- * A single point in an occupancy history series.
+ * A single point in a room's occupancy history series.
  *
- * @param time       the instant the measurement applies to (slot start for
- *                   downsampled series)
- * @param count      the anonymized headcount; the rounded average when the
- *                   series is downsampled into slots
- * @param confidence confidence score of the measurement in [0.0, 1.0]
+ * <p>Points are emitted on a regular, window-scaled slot grid (#278). A slot with no
+ * readings is still emitted, with a {@code null} {@code count} marking the gap — so an
+ * empty slot is distinguishable from a real {@code count = 0}, letting the frontend
+ * draw a continuous time axis instead of collapsing missing periods into time jumps.
+ *
+ * @param time       the slot-start instant on the grid
+ * @param count      the average anonymized headcount over the slot, rounded to the
+ *                   nearest whole person, or {@code null} if the slot had no readings
+ *                   (an explicit gap, not zero occupancy)
+ * @param confidence the average measurement confidence over the slot in [0.0, 1.0];
+ *                   {@code 0.0} for an empty slot
  */
 public record HistoryPoint(
         Instant time,
-        int count,
+        Integer count,
         double confidence
 ) {}

@@ -47,7 +47,7 @@ export const WeekPatternHeatmap = ({pattern, peakTime, quietTime}: WeekPattern) 
                 {/* Weekday per Line */}
                 {weekDays.map(day => (
                     <React.Fragment key={day}>
-                        <div>{dayLabels[day]}</div> {/* MO, Di, Mi...*/}
+                        <div>{dayLabels[day]}</div> {/* short weekday label*/}
                         {hours.map(hour => {
                             const slot = pattern.find(s => s.dayOfWeek === day && s.hour === hour);
                             const color = getColor(slot?.avgRate ?? 0);

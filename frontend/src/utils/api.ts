@@ -1,9 +1,11 @@
 import axios from 'axios';
 import { useAuthStore, TOKEN_ENDPOINT, CLIENT_ID } from "../hooks/useAuthStore";
 import type { ForecastResponse, HistoryResponse, WeekPatternResponse, RoomResponse } from "../types/room";
+import type { MetricsResponse } from "../types/metrics";
 
 const api = axios.create({
     baseURL: import.meta.env.VITE_API_URL,
+    timeout: 10000,
     headers: {
         'Content-Type': 'application/json',
     },
@@ -98,6 +100,10 @@ export function updateRoom(id: string, data: {roomId: string; name: string; buil
 
 export function deleteRoom(id: string) {
     return api.delete(`/rooms/${id}`)
+}
+
+export function fetchMetrics(): Promise<MetricsResponse[]> {
+    return api.get<MetricsResponse[]>('/metrics').then(res => res.data);
 }
 
 export default api;

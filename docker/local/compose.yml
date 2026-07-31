@@ -1,0 +1,197 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# OccuPi — local full stack, out of the box.
+#
+#   cd docker/local
+#   docker compose up -d --build
+#
+# That is the whole setup: backend + frontend build from source, Keycloak imports
+# a localhost realm (test users included), Grafana provisions its datasource and
+# dashboard, and the mock fleet simulates one Raspberry Pi per room listed in
+# MOCK_ROOMS (see .env — the only value you are expected to touch). The backend
+# seeds exactly those rooms into Postgres at startup, so the dashboard shows
+# them without a single click.
+#
+# Runs in the open 'dev' profile by default (no login). To test the full auth
+# flow, uncomment SPRING_PROFILES_ACTIVE=prod in .env and rebuild backend+frontend.
+#
+# This stack is independent of the legacy docker/ compose files (own project
+# name, own volumes). `docker compose down -v` resets it completely.
+# ─────────────────────────────────────────────────────────────────────────────
+name: occupi-local
+
+services:
+  backend:
+    build:
+      context: ../../backend
+      dockerfile: Dockerfile
+    environment:
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
+      POSTGRES_URL: jdbc:postgresql://postgres:5432/occupi
+      POSTGRES_USER: ${POSTGRES_USER:-occupi}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-occupi}
+      INFLUXDB_URL: http://influxdb:8181
+      KEYCLOAK_JWK_SET_URI: http://keycloak:8080/realms/occupi/protocol/openid-connect/certs
+      # One value drives both the mock fleet and the room seed — the coupling
+      # lives here in the compose file, the backend stays generic.
+      OCCUPI_SEED_ROOMS: ${MOCK_ROOMS}
+    ports:
+      - "8080:8080"
+    depends_on:
+      influxdb:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      keycloak:
+        condition: service_healthy
+    # temurin-jre has no curl, and its /bin/sh is dash — /dev/tcp needs bash,
+    # so the probe runs bash explicitly. /v3/api-docs is open in both profiles.
+    healthcheck:
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/localhost/8080 && printf 'GET /v3/api-docs HTTP/1.0\\r\\n\\r\\n' >&3 && grep -q openapi <&3"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 40s
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ../../frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: http://localhost:8080/api
+        VITE_KEYCLOAK_URL: http://localhost:8180
+        VITE_KEYCLOAK_REALM: occupi
+        VITE_KEYCLOAK_CLIENT_ID: occupi-frontend
+    ports:
+      - "3000:80"
+    restart: unless-stopped
+
+  mock:
+    build:
+      context: ./mock
+    environment:
+      MOCK_ROOMS: ${MOCK_ROOMS}
+      BACKEND_HOST: backend
+      BACKEND_PORT: "8080"
+      MOCK_OCCUPANCY_INTERVAL: ${MOCK_OCCUPANCY_INTERVAL:-5}
+      MOCK_METRICS_INTERVAL: ${MOCK_METRICS_INTERVAL:-30}
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+
+  influxdb:
+    image: influxdb:3.9.3-core
+    environment:
+      INFLUXDB3_HOST_ID: occupi-local
+    # --without-auth is fine here: the port is only published to your machine.
+    # The server stack runs with token auth instead.
+    command: >
+      serve --host-id occupi-local --http-bind 0.0.0.0:8181
+      --object-store file --data-dir /var/lib/influxdb3
+      --without-auth --query-file-limit 10000
+    volumes:
+      - influxdb3-data:/var/lib/influxdb3
+    ports:
+      - "8181:8181"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8181/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: occupi
+      POSTGRES_USER: ${POSTGRES_USER:-occupi}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-occupi}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ../shared/postgres-init:/docker-entrypoint-initdb.d:ro
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-occupi} -d occupi"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.2
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_ADMIN:-admin}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-admin}
+      KC_HOSTNAME: localhost
+      KC_HOSTNAME_PORT: "8180"
+      KC_HOSTNAME_STRICT: "false"
+      KC_HTTP_ENABLED: "true"
+      KC_HEALTH_ENABLED: "true"
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://postgres:5432/keycloak
+      KC_DB_USERNAME: ${POSTGRES_USER:-occupi}
+      KC_DB_PASSWORD: ${POSTGRES_PASSWORD:-occupi}
+    # --import-realm applies realm-local.json only while the realm does not exist
+    # yet — after editing the file, `docker compose down -v` and start fresh.
+    command: start-dev --import-realm
+    volumes:
+      - ./keycloak/realm-local.json:/opt/keycloak/data/import/realm-local.json:ro
+    ports:
+      - "8180:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/localhost/9000 && echo -e 'GET /health/ready HTTP/1.0\\r\\n\\r\\n' >&3 && grep -q 'UP' <&3"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    restart: unless-stopped
+
+  # One-shot: allows plain-HTTP access to the ADMIN CONSOLE (master realm).
+  # The occupi realm gets sslRequired=none via the import file, but Keycloak
+  # bootstraps the master realm itself — it is never imported. Docker Desktop
+  # hands host connections to the container with a source address Keycloak does
+  # not treat as local, so without this the console answers "HTTPS required".
+  # Idempotent, runs on every up, survives `down -v`.
+  keycloak-init:
+    image: quay.io/keycloak/keycloak:26.2
+    restart: "no"
+    entrypoint: ["/bin/bash", "-c"]
+    command:
+      - >
+        /opt/keycloak/bin/kcadm.sh config credentials
+        --server http://keycloak:8080 --realm master
+        --user ${KEYCLOAK_ADMIN:-admin} --password ${KEYCLOAK_ADMIN_PASSWORD:-admin}
+        && /opt/keycloak/bin/kcadm.sh update realms/master -s sslRequired=NONE
+        && echo "master realm: sslRequired=NONE (plain-HTTP admin console)"
+    depends_on:
+      keycloak:
+        condition: service_healthy
+
+  grafana:
+    image: grafana/grafana:11.6.1
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
+      GF_INSTALL_PLUGINS: influxdata-flightsql-datasource
+    volumes:
+      - ./grafana/datasources:/etc/grafana/provisioning/datasources:ro
+      - ../shared/grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - grafana-data:/var/lib/grafana
+    # 3000 belongs to the frontend — Grafana lives on 3001.
+    ports:
+      - "3001:3000"
+    depends_on:
+      influxdb:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  influxdb3-data:
+  postgres-data:
+  grafana-data:

@@ -1,4 +1,4 @@
-//Detaillierter als eine Zahl, was passiert im Moment
+// A live occupancy reading for one room: headcount plus how reliable it is
 export interface Occupancy{
     roomId: string;
     count: number;
@@ -9,12 +9,12 @@ export interface Occupancy{
 
 export interface ForecastPoint {
     time: string;
-    predictedCount: number;
+    predictedCount: number | null;
 }
 
 export interface HistoryPoint {
     time: string;
-    count: number;
+    count: number | null;
     confidence: number;
 }
 
@@ -62,11 +62,11 @@ export interface Room {
     name: string;
     building: string;
     floor: number;
-    capacity: number; // How many people can fit in the room?
-    count: number; // How many people are in the room?
+    capacity: number; // How many people can fit in the room
+    count: number; // How many people are currently in the room
     confidence: number;
-    timestamp: string; //
-    occupancyRate: 'low' | 'medium' | 'high'; // status
+    timestamp: string; // ISO timestamp of the latest reading, empty when unknown
+    occupancyRate: 'low' | 'medium' | 'high' | 'unknown'; // derived status shown in the UI
 }
 
 export interface RoomResponse {

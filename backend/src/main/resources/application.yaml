@@ -21,10 +21,45 @@ spring:
       ddl-auto: update
     open-in-view: false
 
+# Same env-with-local-default pattern as the datasource above: Docker/prod override
+# via INFLUXDB_*, a bare local run works without any environment.
 influxdb:
-  url: http://localhost:8181
-  database: occupi
-  token: ""
+  url: ${INFLUXDB_URL:http://localhost:8181}
+  database: ${INFLUXDB_DATABASE:occupi}
+  token: ${INFLUXDB_TOKEN:}
+
+# Origin patterns for browser access, consumed by both the HTTP CORS configuration
+# and the WebSocket handshake (CorsProperties). The default allows any localhost
+# port plus the production domain; deployments under another hostname override via
+# CORS_ALLOWED_ORIGINS (comma-separated).
+occupi:
+  cors:
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:*,https://occupi.mi.hdm-stuttgart.de}
+
+# "Latest per room / per sensor" reads are the union of InfluxDB's in-memory last
+# value cache (#294) — latest-lookback-days is that cache's TTL — and a scan
+# bounded to latest-fallback-days, which restores rooms the cache lost across an
+# InfluxDB restart. The scan window is kept short because a wider scan pinned the
+# single-core server CPU (#273) and now exceeds InfluxDB's parquet file limit at
+# roughly three to four days' worth of files. history-max-days clamps how far back
+# the metrics history endpoint may reach, for the same reason.
+occupancy:
+  latest-lookback-days: 7
+  latest-fallback-days: 2
+metrics:
+  latest-lookback-days: 7
+  latest-fallback-days: 2
+  history-max-days: 7
+
+# Caches for the room-detail reads (history / forecast / week-pattern). These results
+# are identical for every viewer of a room and change slowly, so a short-lived cache
+# keeps repeated and concurrent requests off the CPU-capped InfluxDB (#280).
+chart:
+  cache:
+    history-ttl-seconds: 60
+    forecast-ttl-seconds: 600
+    weekpattern-ttl-seconds: 1800
+    max-entries: 2000
 
 logging:
   level:

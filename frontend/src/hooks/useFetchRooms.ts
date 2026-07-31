@@ -5,37 +5,46 @@ import api from '../utils/api';
 import type { Room, RoomResponse, Occupancy } from '../types/room';
 
 export function useFetchRooms() {
-    // we retrieve spaces and function for setting them from the sore
+    // setters for the room list and the mock-data flag, plus the live-connection state
     const { setRooms, isConnected, setIsMockData } = useRoomStore();
 
     const fetchRooms = useCallback (async() => {
-        try {
-            const [roomsRes, occupancyRes] = await Promise.all([
-                api.get<RoomResponse[]>('/rooms'),
-                api.get<Occupancy[]>('/occupancy/all')
-            ]);
+        const [roomsResult, occupancyResult] = await Promise.allSettled([
+            api.get<RoomResponse[]>('/rooms'),
+            api.get<Occupancy[]>('/occupancy/all'),
+        ]);
 
-            const combined: Room[] = roomsRes.data.map((room) => {
-                const occ = occupancyRes.data.find((o) => o.roomId === room.roomId);
-                const ratio = (occ?.count ?? 0) / room.capacity;
-                const occupancyRate = ratio < 0.5 ? 'low' : ratio < 0.8 ? 'medium' : 'high';
-                return {
-                    ...room,
-                    count: occ?.count ?? 0,
-                    confidence: occ?.confidence ?? 0,
-                    timestamp: occ?.timestamp ?? '',
-                    occupancyRate,
-                };
-            });
-
-            // as long as there are no room data in the DB, show / use mock data
-            setRooms(combined.length > 0 ? combined : MOCK_ROOMS);
-            setIsMockData(combined.length === 0);
-        } catch (error) {
-            console.error("Fehler beim Laden:", error);
+        // Only fall back to mock data if the /rooms call itself fails
+        if (roomsResult.status === 'rejected') {
+            console.error("Failed to load rooms:", roomsResult.reason);
             setRooms(MOCK_ROOMS);
             setIsMockData(true);
+            return;
         }
+
+        const occupancyAvailable = occupancyResult.status === 'fulfilled';
+        // inline status check so TypeScript narrows to the fulfilled result
+        const occupancyData = occupancyAvailable ? occupancyResult.value.data : [];
+
+        const combined: Room[] = roomsResult.value.data.map((room) => {
+            // Occupancy call failed → occupancy is UNKNOWN, not 0
+            if (!occupancyAvailable) {
+                return { ...room, count: 0, confidence: 0, timestamp: '', occupancyRate: 'unknown' };
+            }
+            const occ = occupancyData.find((o) => o.roomId === room.roomId);
+            const ratio = (occ?.count ?? 0) / room.capacity;
+            const occupancyRate = ratio < 0.5 ? 'low' : ratio < 0.8 ? 'medium' : 'high';
+            return {
+                ...room,
+                count: occ?.count ?? 0,
+                confidence: occ?.confidence ?? 0,
+                timestamp: occ?.timestamp ?? '',
+                occupancyRate,
+            };
+        });
+
+        setRooms(combined.length > 0 ? combined : MOCK_ROOMS);
+        setIsMockData(combined.length === 0);
     }, [setRooms, setIsMockData]);
 
     useEffect(() => {

@@ -36,11 +36,8 @@ public class ForecastController {
             @RequestParam String roomId,
             @RequestParam(defaultValue = "2") int forecastHours) {
 
-        if (roomId == null || roomId.isBlank()) {
-            return ResponseEntity.badRequest().build();
-        }
         if (forecastHours <= 0) {
-            return ResponseEntity.badRequest().build();
+            throw new IllegalArgumentException("forecastHours must be greater than 0");
         }
 
         ForecastResponse response = forecastService.forecast(roomId, forecastHours);
