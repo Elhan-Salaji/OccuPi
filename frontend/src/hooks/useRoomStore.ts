@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import type { Room } from '../types/room';
 
-// What the store has to be able to do
+// Everything the room store exposes to components
 interface RoomState {
     rooms: Room[];
     setRooms: (rooms: Room[]) => void;

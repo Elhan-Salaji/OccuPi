@@ -6,7 +6,7 @@ import { RoomDetailModal} from "../components/RoomDetailModal";
 import { useDashboardStore } from "../hooks/useDashboardStore";
 
 export default function Dashboard() {
-    // we retrieve spaces and function for setting them from the sore
+    // read the room list and the connection/mock-data flags from the store
     const { rooms, isConnected, isMockData } = useRoomStore();
 
     const [selectedRoom, setSelectedRoom] = useState<Room | null>(null);

@@ -5,7 +5,7 @@ import api from '../utils/api';
 import type { Room, RoomResponse, Occupancy } from '../types/room';
 
 export function useFetchRooms() {
-    // we retrieve spaces and function for setting them from the sore
+    // setters for the room list and the mock-data flag, plus the live-connection state
     const { setRooms, isConnected, setIsMockData } = useRoomStore();
 
     const fetchRooms = useCallback (async() => {
@@ -16,7 +16,7 @@ export function useFetchRooms() {
 
         // Only fall back to mock data if the /rooms call itself fails
         if (roomsResult.status === 'rejected') {
-            console.error("Fehler beim Laden der Räume:", roomsResult.reason);
+            console.error("Failed to load rooms:", roomsResult.reason);
             setRooms(MOCK_ROOMS);
             setIsMockData(true);
             return;
