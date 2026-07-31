@@ -1,5 +1,6 @@
 package com.occupi.feature.room;
 
+import com.occupi.feature.room.dto.RoomImportResult;
 import com.occupi.feature.room.dto.RoomRequest;
 import com.occupi.feature.room.dto.RoomResponse;
 import com.occupi.feature.sensor.Sensor;
@@ -150,5 +151,30 @@ class RoomServiceImplTest {
         assertThatThrownBy(() -> service.deleteRoom("ghost"))
                 .isInstanceOf(RoomNotFoundException.class);
         verify(roomRepository, never()).deleteById(anyString());
+    }
+
+    @Test
+    @DisplayName("importRooms upserts and reports created vs updated counts")
+    void importRooms_countsCreatedAndUpdated() {
+        when(roomRepository.existsById("room-1")).thenReturn(true);   // exists → update
+        when(roomRepository.existsById("room-2")).thenReturn(false);  // new → create
+        when(roomRepository.save(any(Room.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        RoomImportResult result = service.importRooms(List.of(request("room-1"), request("room-2")));
+
+        assertThat(result.created()).isEqualTo(1);
+        assertThat(result.updated()).isEqualTo(1);
+        assertThat(result.errors()).isEmpty();
+        verify(roomRepository, times(2)).save(any(Room.class));
+    }
+
+    @Test
+    @DisplayName("importRooms on an empty list saves nothing")
+    void importRooms_empty() {
+        RoomImportResult result = service.importRooms(List.of());
+
+        assertThat(result.created()).isZero();
+        assertThat(result.updated()).isZero();
+        verify(roomRepository, never()).save(any());
     }
 }

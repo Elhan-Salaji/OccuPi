@@ -157,6 +157,13 @@
 			<artifactId>caffeine</artifactId>
 		</dependency>
 
+		<!-- Apache Commons CSV — RFC 4180 read/write for room import/export (#343) -->
+		<dependency>
+			<groupId>org.apache.commons</groupId>
+			<artifactId>commons-csv</artifactId>
+			<version>1.14.1</version>
+		</dependency>
+
 		<!-- Mockito for TDD -->
 		<dependency>
 			<groupId>org.mockito</groupId>
