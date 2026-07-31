@@ -16,6 +16,7 @@ import java.time.Instant;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -58,27 +59,28 @@ class ForecastControllerTest {
     @Test
     @DisplayName("returns 400 when roomId is blank")
     void getForecast_blankRoomId_returns400() {
-        ResponseEntity<ForecastResponse> response = controller.getForecast("  ", 2);
+        when(forecastService.forecast("  ", 2))
+                .thenThrow(new IllegalArgumentException("roomId must not be blank"));
 
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
-        verifyNoInteractions(forecastService);
+        assertThrows(IllegalArgumentException.class,
+                () -> controller.getForecast("  ", 2));
     }
 
     @Test
     @DisplayName("returns 400 when forecastHours is zero")
     void getForecast_zeroHours_returns400() {
-        ResponseEntity<ForecastResponse> response = controller.getForecast("room-1", 0);
+        assertThrows(IllegalArgumentException.class,
+                () -> controller.getForecast("room-1", 0));
 
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
         verifyNoInteractions(forecastService);
     }
 
     @Test
     @DisplayName("returns 400 when forecastHours is negative")
     void getForecast_negativeHours_returns400() {
-        ResponseEntity<ForecastResponse> response = controller.getForecast("room-1", -10);
+        assertThrows(IllegalArgumentException.class,
+                () -> controller.getForecast("room-1", -10));
 
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
         verifyNoInteractions(forecastService);
     }
 }

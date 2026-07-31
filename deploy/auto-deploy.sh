@@ -1,23 +1,25 @@
 #!/usr/bin/env bash
 #
-# OccuPi — automatic deploy (poll & apply the latest GHCR images, health-gated).
+# OccuPi — automatic deploy (build from source on new commits, health-gated).
 #
 # Invoked periodically by occupi-autodeploy.timer. Each run:
-#   1. fast-forwards the repo (compose files + this script itself),
-#   2. pulls the latest backend/frontend images from GHCR,
-#   3. recreates ONLY the services whose image actually changed,
-#   4. health-checks each; on failure it ROLLS BACK to the previous image and
-#      records the bad digest so it is not redeployed until :latest moves on,
+#   1. fetches origin and compares commits — no new commit on the branch means
+#      the run is a cheap no-op,
+#   2. fast-forwards the repo (compose files, sources and this script itself),
+#   3. builds backend and frontend from source, ONE AT A TIME (the single-core
+#      host must never run two builds at once; a swap file is required — an
+#      unswapped build killed this VM once, see #140 and the root README),
+#   4. recreates the two services and health-checks them; on failure it ROLLS
+#      BACK to the last good commit (reset + rebuild) and records the bad
+#      commit so it is not retried until the branch moves on,
 #   5. prunes old images to reclaim disk.
 #
-# Infra (postgres / keycloak / influxdb) is intentionally NOT touched here —
-# those are pinned versions and updated manually (a DB major upgrade can need
-# migration steps). See deploy/README.md.
+# Infra (postgres / keycloak / influxdb / grafana) is intentionally NOT touched
+# here — pinned versions, updated manually. See the root README.
 #
 # Runs as root via systemd. Logs go to journald:  journalctl -u occupi-autodeploy
 #
-# The server only ever PULLS prebuilt images and never builds (see #140), so this
-# always uses the prod overlay explicitly — never the local override.
+# The stack lives in docker/server (single compose file + .env).
 
 set -euo pipefail
 
@@ -26,10 +28,9 @@ set -euo pipefail
 # mid-run; reading it up front prevents that from corrupting execution.
 {
 
-# ── Configuration ────────────────────────────────────────────────────────────
-REPO_DIR="/home/Elhan/Occupi"
-BRANCH="develop"
-REGISTRY_OWNER="ghcr.io/elhan-salaji"
+# ── Configuration (env-overridable for non-standard hosts) ───────────────────
+REPO_DIR="${REPO_DIR:-/home/Elhan/Occupi}"
+BRANCH="${BRANCH:-develop}"
 SERVICES=(backend frontend)          # infra is updated manually on purpose
 STATE_DIR="/var/lib/occupi-autodeploy"
 LOCKFILE="/run/occupi-autodeploy.lock"
@@ -37,22 +38,17 @@ HEALTH_RETRIES=40                    # 40 x 3s = up to 120s for a service to com
 HEALTH_DELAY=3
 PRUNE_OLDER_THAN="336h"              # drop unused images older than 14 days
 
-COMPOSE_DIR="$REPO_DIR/docker"
+COMPOSE_FILE="$REPO_DIR/docker/server/compose.yml"
 
 log() { echo "[$(date -Is)] $*"; }
 
-# Compose helper — ALWAYS base + prod overlay, never the local override.
+# Compose helper — project dir is docker/server so its .env is picked up.
 dc() {
-  docker compose -f "$COMPOSE_DIR/docker-compose.yml" \
-                 -f "$COMPOSE_DIR/docker-compose.prod.yml" "$@"
+  docker compose --project-directory "$REPO_DIR/docker/server" \
+                 -f "$COMPOSE_FILE" "$@"
 }
 
-img_ref()       { echo "$REGISTRY_OWNER/occupi-$1:latest"; }
-running_image() { docker inspect --format '{{.Image}}' "occupi-$1" 2>/dev/null || echo "none"; }
-tag_image_id()  { docker image inspect --format '{{.Id}}' "$(img_ref "$1")" 2>/dev/null || echo "none"; }
-tag_digest()    { docker image inspect --format '{{if .RepoDigests}}{{index .RepoDigests 0}}{{end}}' "$(img_ref "$1")" 2>/dev/null || echo ""; }
-
-# Liveness URL per service, checked from the host (the prod overlay publishes
+# Liveness URL per service, checked from the host (docker/server publishes
 # these on 127.0.0.1). backend: /v3/api-docs is permitAll in the prod
 # SecurityConfig -> 200 when up. frontend: nginx serves the SPA index -> 200.
 health_url() {
@@ -75,6 +71,27 @@ wait_healthy() {
   return 1
 }
 
+# Serial build + recreate + health-gate for every service. Returns non-zero on
+# the first failure, leaving the loop early.
+build_and_apply() {
+  local svc
+  for svc in "${SERVICES[@]}"; do
+    log "$svc: building"
+    dc build "$svc" || { log "ERROR: $svc build failed"; return 1; }
+  done
+  for svc in "${SERVICES[@]}"; do
+    log "$svc: recreating"
+    dc up -d "$svc" || { log "ERROR: $svc up failed"; return 1; }
+    if wait_healthy "$(health_url "$svc")"; then
+      log "$svc: healthy"
+    else
+      log "ERROR: $svc did not come up healthy"
+      return 1
+    fi
+  done
+  return 0
+}
+
 # ── Single-instance lock (skip if a previous run is still going) ─────────────
 exec 9>"$LOCKFILE"
 if ! flock -n 9; then
@@ -83,87 +100,78 @@ if ! flock -n 9; then
 fi
 
 mkdir -p "$STATE_DIR"
+LAST_GOOD_FILE="$STATE_DIR/last-good-commit"
+BAD_FILE="$STATE_DIR/bad-commit"
 
-# ── 1. Sync the repo (compose files + this script) ───────────────────────────
+# ── 1. What does origin have? ────────────────────────────────────────────────
 log "fetching origin/$BRANCH in $REPO_DIR"
-if git -C "$REPO_DIR" fetch --quiet --prune origin "$BRANCH"; then
-  if git -C "$REPO_DIR" merge-base --is-ancestor HEAD "origin/$BRANCH"; then
-    if git -C "$REPO_DIR" pull --ff-only --quiet origin "$BRANCH"; then
-      log "repo fast-forwarded to $(git -C "$REPO_DIR" rev-parse --short HEAD)"
-    else
-      log "WARN: git pull failed — continuing with existing checkout"
-    fi
-  else
-    log "WARN: local HEAD diverged from origin/$BRANCH — skipping repo update"
+if ! git -C "$REPO_DIR" fetch --quiet --prune origin "$BRANCH"; then
+  log "WARN: git fetch failed — nothing to compare, exiting"
+  exit 0
+fi
+
+remote=$(git -C "$REPO_DIR" rev-parse "origin/$BRANCH")
+head=$(git -C "$REPO_DIR" rev-parse HEAD)
+
+if [ -f "$BAD_FILE" ] && [ "$(cat "$BAD_FILE")" = "$remote" ]; then
+  log "origin/$BRANCH ($remote) is known-bad — waiting for a new commit"
+  exit 0
+fi
+
+# Nothing new AND the services are running -> cheap no-op. When a service is
+# down despite an unchanged commit (first adoption, crashed container), fall
+# through and rebuild the current checkout.
+if [ "$remote" = "$head" ]; then
+  running=$(dc ps --status running --format '{{.Service}}' 2>/dev/null || true)
+  if echo "$running" | grep -q "backend" && echo "$running" | grep -q "frontend"; then
+    log "nothing to deploy — already at $(git -C "$REPO_DIR" rev-parse --short HEAD)"
+    exit 0
   fi
+  log "commit unchanged but services not running — rebuilding current checkout"
 else
-  log "WARN: git fetch failed — continuing with existing checkout"
-fi
-
-# ── 2. Pull the latest images (download only; running containers untouched) ───
-log "pulling images: ${SERVICES[*]}"
-dc pull "${SERVICES[@]}" || log "WARN: docker pull failed — using locally cached images"
-
-# ── 3. Apply changed services, health-gated with rollback ────────────────────
-failed=0
-changed_any=0
-
-for svc in "${SERVICES[@]}"; do
-  before=$(running_image "$svc")
-  after=$(tag_image_id "$svc")
-
-  if [ "$before" = "$after" ] && [ "$before" != "none" ]; then
-    log "$svc: up to date"
-    continue
-  fi
-
-  digest=$(tag_digest "$svc")
-  bad_marker="$STATE_DIR/$svc.bad"
-  if [ -n "$digest" ] && [ -f "$bad_marker" ] && [ "$(cat "$bad_marker")" = "$digest" ]; then
-    log "$svc: current :latest digest is known-bad — skipping until it changes"
-    continue
-  fi
-
-  changed_any=1
-  log "$svc: updating ($before -> $after)"
-
-  ok=1
-  dc up -d "$svc" || ok=0
-  if [ "$ok" = "1" ] && wait_healthy "$(health_url "$svc")"; then
-    log "$svc: healthy after update"
-    rm -f "$bad_marker"
+  # ── 2. Fast-forward the repo ───────────────────────────────────────────────
+  if git -C "$REPO_DIR" merge-base --is-ancestor HEAD "origin/$BRANCH"; then
+    git -C "$REPO_DIR" pull --ff-only --quiet origin "$BRANCH"
+    log "repo fast-forwarded to $(git -C "$REPO_DIR" rev-parse --short HEAD)"
   else
-    log "ERROR: $svc did not come up healthy"
-    failed=1
-    if [ -n "$digest" ]; then echo "$digest" > "$bad_marker"; fi
-    if [ "$before" != "none" ]; then
-      log "$svc: rolling back to previous image $before"
-      docker tag "$before" "$(img_ref "$svc")" || true
-      dc up -d "$svc" || true
-      if wait_healthy "$(health_url "$svc")"; then
-        log "$svc: healthy again after rollback"
-      else
-        log "CRITICAL: $svc still unhealthy after rollback — manual intervention needed"
-      fi
-    else
-      log "CRITICAL: $svc has no previous image to roll back to — manual intervention needed"
-    fi
+    log "WARN: local HEAD diverged from origin/$BRANCH — skipping this run"
+    exit 0
   fi
-done
-
-# ── 4. Reclaim disk ──────────────────────────────────────────────────────────
-docker image prune -f >/dev/null 2>&1 || true
-docker image prune -af --filter "until=$PRUNE_OLDER_THAN" >/dev/null 2>&1 || true
-
-if [ "$changed_any" = "0" ]; then
-  log "nothing to deploy — already current"
 fi
 
-if [ "$failed" != "0" ]; then
+# ── 3. Build serially, recreate, health-gate ─────────────────────────────────
+deployed=$(git -C "$REPO_DIR" rev-parse HEAD)
+
+if build_and_apply; then
+  echo "$deployed" > "$LAST_GOOD_FILE"
+  rm -f "$BAD_FILE"
+  log "deploy of $(git -C "$REPO_DIR" rev-parse --short HEAD) finished OK"
+else
+  echo "$deployed" > "$BAD_FILE"
+  last_good=$(cat "$LAST_GOOD_FILE" 2>/dev/null || echo "")
+  if [ -n "$last_good" ] && [ "$last_good" != "$deployed" ]; then
+    log "rolling back to last good commit ${last_good:0:8} (rebuild takes a few minutes)"
+    # The server checkout is deploy-only — reset is safe, and the bad-commit
+    # marker keeps the next tick from re-deploying the bad commit until the
+    # branch moves past it.
+    git -C "$REPO_DIR" reset --hard "$last_good"
+    if build_and_apply; then
+      log "rollback to ${last_good:0:8} healthy"
+    else
+      log "CRITICAL: rollback build also failed — manual intervention needed"
+    fi
+  else
+    log "CRITICAL: no last good commit to roll back to — manual intervention needed"
+  fi
+  docker image prune -f >/dev/null 2>&1 || true
   log "auto-deploy finished WITH ERRORS"
   exit 1
 fi
-log "auto-deploy finished OK"
+
+# ── 4. Reclaim disk (source builds leave dangling layers behind) ─────────────
+docker image prune -f >/dev/null 2>&1 || true
+docker image prune -af --filter "until=$PRUNE_OLDER_THAN" >/dev/null 2>&1 || true
+
 exit 0
 
 }

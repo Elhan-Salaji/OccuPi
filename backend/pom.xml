@@ -10,7 +10,7 @@
 	</parent>
 	<groupId>com.occupi</groupId>
 	<artifactId>app</artifactId>
-	<version>0.0.1-SNAPSHOT</version>
+	<version>1.0.0</version>
 	<name/>
 	<description/>
 	<url/>
@@ -144,6 +144,24 @@
 			<groupId>com.influxdb</groupId>
 			<artifactId>influxdb3-java</artifactId>
 			<version>${influxdb3.version}</version>
+		</dependency>
+
+		<!-- In-memory caching (Caffeine) for the room-detail chart/forecast reads (#280).
+		     Keeps repeated/concurrent requests for the same room off the CPU-capped InfluxDB. -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-cache</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>com.github.ben-manes.caffeine</groupId>
+			<artifactId>caffeine</artifactId>
+		</dependency>
+
+		<!-- Apache Commons CSV — RFC 4180 read/write for room import/export (#343) -->
+		<dependency>
+			<groupId>org.apache.commons</groupId>
+			<artifactId>commons-csv</artifactId>
+			<version>1.14.1</version>
 		</dependency>
 
 		<!-- Mockito for TDD -->

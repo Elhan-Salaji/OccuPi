@@ -17,10 +17,10 @@ interface AuthState {
 
 // Keycloak connection — overridable via env, with local-dev defaults so the
 // app works out of the box against the local Docker stack.
-const KEYCLOAK_URL = import.meta.env.VITE_KEYCLOAK_URL ?? 'http://localhost:8180';
-const REALM = import.meta.env.VITE_KEYCLOAK_REALM ?? 'occupi';
-const CLIENT_ID = import.meta.env.VITE_KEYCLOAK_CLIENT_ID ?? 'occupi-frontend';
-const TOKEN_ENDPOINT = `${KEYCLOAK_URL}/realms/${REALM}/protocol/openid-connect/token`;
+export const KEYCLOAK_URL = import.meta.env.VITE_KEYCLOAK_URL ?? 'http://localhost:8180';
+export const REALM = import.meta.env.VITE_KEYCLOAK_REALM ?? 'occupi';
+export const CLIENT_ID = import.meta.env.VITE_KEYCLOAK_CLIENT_ID ?? 'occupi-frontend';
+export const TOKEN_ENDPOINT = `${KEYCLOAK_URL}/realms/${REALM}/protocol/openid-connect/token`;
 
 interface JwtClaims {
     preferred_username?: string;

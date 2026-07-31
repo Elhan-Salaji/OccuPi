@@ -1,4 +1,4 @@
-//Detaillierter als eine Zahl, was passiert im Moment
+// A live occupancy reading for one room: headcount plus how reliable it is
 export interface Occupancy{
     roomId: string;
     count: number;
@@ -6,12 +6,55 @@ export interface Occupancy{
     timestamp: string;
 }
 
-//Was wird in Zukunft passieren?
-export interface Forecast{
+
+export interface ForecastPoint {
+    time: string;
+    predictedCount: number | null;
+}
+
+export interface HistoryPoint {
+    time: string;
+    count: number | null;
+    confidence: number;
+}
+
+export interface TimeSlotSummary {
+    dayOfWeek: string;
+    hour: number;
+    avgRate: number;
+}
+
+export interface WeekPatternSlot {
+    dayOfWeek: string;
+    hour: number;
+    avgOccupancy: number;
+    avgRate: number;
+}
+
+// GET /api/forecast?roomId=X&forecastHours=12
+export interface ForecastResponse {
     roomId: string;
-    forecastTime: string;
-    predictedOccupancy: number;
-    probability: number; //Algorithmus
+    forecastHours: number;
+    forecast: ForecastPoint[];
+    confidence: number;
+    generatedAt: string;
+}
+
+// GET /api/occupancy/history?roomId=X&hours=24
+export interface HistoryResponse {
+    roomId: string;
+    points: HistoryPoint[];
+    start: string;
+    end: string;
+}
+
+// GET /api/occupancy/weekpattern?roomId=X&weeks=8
+export interface WeekPatternResponse {
+    roomId: string;
+    weeks: number;
+    pattern: WeekPatternSlot[];
+    peakTime: TimeSlotSummary | null;
+    quietTime: TimeSlotSummary | null;
 }
 
 export interface Room {
@@ -19,11 +62,11 @@ export interface Room {
     name: string;
     building: string;
     floor: number;
-    capacity: number; // How many people can fit in the room?
-    count: number; // How many people are in the room?
+    capacity: number; // How many people can fit in the room
+    count: number; // How many people are currently in the room
     confidence: number;
-    timestamp: string; //
-    occupancyRate: 'low' | 'medium' | 'high'; // status
+    timestamp: string; // ISO timestamp of the latest reading, empty when unknown
+    occupancyRate: 'low' | 'medium' | 'high' | 'unknown'; // derived status shown in the UI
 }
 
 export interface RoomResponse {
@@ -32,4 +75,16 @@ export interface RoomResponse {
     building: string;
     floor: number;
     capacity: number;
+}
+
+// POST /api/rooms/import
+export interface RoomImportError {
+    row: number; // 1-based line in the CSV, the header being line 1
+    message: string;
+}
+
+export interface RoomImportResult {
+    created: number;
+    updated: number;
+    errors: RoomImportError[];
 }

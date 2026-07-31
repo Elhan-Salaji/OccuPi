@@ -51,29 +51,48 @@ def get_system_metrics() -> dict:
         "memory_percent": psutil.virtual_memory().percent,
     }
 
-def log_snapshot(_queue, _metrics) -> None:
-    """Logs a single metrics snapshot."""
+def collect_snapshot(_queue, _metrics) -> dict:
+    """Collects one metrics snapshot in the backend's payload shape. The camelCase
+    field names match the Metrics DTO and the InfluxDB fields. sensorId and the
+    timestamp are added by the sender (see _send_metrics in main.py, #110)."""
     sys_m = get_system_metrics()
     thr_m = _metrics.snapshot()
+    return {
+        "cpuPercentage": sys_m["cpu_percent"],
+        "memoryPercentage": sys_m["memory_percent"],
+        "queueSize": _queue.qsize(),
+        "sent": thr_m["sent"],
+        "dropped": thr_m["dropped"],
+        "avgProcessTime": thr_m["avg_processing_ms"],
+    }
+
+def log_snapshot(snapshot: dict) -> None:
+    """Logs a single metrics snapshot."""
     log.info(
         f"[metrics] "
-        f"cpu={sys_m['cpu_percent']}% "
-        f"mem={sys_m['memory_percent']}% "
-        f"queue={_queue.qsize()}/{QUEUE_MAX_SIZE} "
-        f"sent={thr_m['sent']} "
-        f"dropped={thr_m['dropped']} "
-        f"avg_processing={thr_m['avg_processing_ms']}ms"
+        f"cpu={snapshot['cpuPercentage']}% "
+        f"mem={snapshot['memoryPercentage']}% "
+        f"queue={snapshot['queueSize']}/{QUEUE_MAX_SIZE} "
+        f"sent={snapshot['sent']} "
+        f"dropped={snapshot['dropped']} "
+        f"avg_processing={snapshot['avgProcessTime']}ms"
     )
 
-def _metrics_loop(_queue, _metrics) -> None:
-    """Periodically logs all system and throughput metrics (issue #16)."""
+def _metrics_loop(_queue, _metrics, send_fn=None) -> None:
+    """Periodically collects, logs, and (if wired) forwards a metrics snapshot
+    to the backend (#16 logging, #110 sending). One snapshot per interval, so the
+    logged and sent values match and the system is sampled once per interval."""
     while True:
         time.sleep(METRICS_INTERVAL)
-        log_snapshot(_queue, _metrics)
+        snapshot = collect_snapshot(_queue, _metrics)
+        log_snapshot(snapshot)
+        if send_fn is not None:
+            send_fn(snapshot)
 
 
-def start_metrics_monitor(_queue, _metrics) -> None:
-    """Starts the metrics loop in a daemon thread."""
-    t = threading.Thread(target=_metrics_loop, args=(_queue, _metrics), daemon=True)
+def start_metrics_monitor(_queue, _metrics, send_fn=None) -> None:
+    """Starts the metrics loop in a daemon thread. If send_fn is given, each
+    snapshot is also forwarded to the backend on every interval."""
+    t = threading.Thread(target=_metrics_loop, args=(_queue, _metrics, send_fn), daemon=True)
     t.start()
     log.info("Metrics monitor started.")

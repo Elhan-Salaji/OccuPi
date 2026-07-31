@@ -1,5 +1,6 @@
 package com.occupi.feature.room;
 
+import com.occupi.feature.room.dto.RoomImportResult;
 import com.occupi.feature.room.dto.RoomRequest;
 import com.occupi.feature.room.dto.RoomResponse;
 
@@ -17,7 +18,11 @@ public interface RoomService {
     /** Returns a single room, or empty if it does not exist. */
     Optional<RoomResponse> getRoom(String roomId);
 
-    /** Creates a new room and returns it. */
+    /**
+     * Creates a new room and returns it.
+     *
+     * @throws RoomAlreadyExistsException if a room with the given roomId already exists
+     */
     RoomResponse createRoom(RoomRequest request);
 
     /**
@@ -33,4 +38,11 @@ public interface RoomService {
      * @throws RoomNotFoundException if no room with the given id exists
      */
     void deleteRoom(String roomId);
+
+    /**
+     * Creates or overwrites the given rooms in one transaction (upsert by
+     * {@code roomId}) and reports how many were created versus updated. An
+     * existing {@code roomId} has all of its fields overwritten by the request.
+     */
+    RoomImportResult importRooms(List<RoomRequest> rooms);
 }

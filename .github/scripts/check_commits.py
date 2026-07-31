@@ -46,20 +46,20 @@ def main() -> None:
     invalid = [m for m in messages if not is_valid(m)]
 
     if invalid:
-        print("Halte dich bitte an das ADR für Git Workflow")
+        print("Please follow the git workflow in CONTRIBUTING.md")
         print()
-        print("Ungültige Commit-Messages:")
+        print("Invalid commit messages:")
         for m in invalid:
             print(f"  ✗ {m}")
         print()
-        print("Erlaubtes Format:  <typ>: <beschreibung> #<issue-nummer>")
-        print("Beispiele:")
+        print("Allowed format:  <type>: <description> #<issue-number>")
+        print("Examples:")
         print("  add: Login endpoint #42")
         print("  fix: NPE in OccupancyService #17")
         print("  update: README with setup instructions #3")
         sys.exit(1)
 
-    print(f"✓ {len(messages)} Commit-Message(s) entsprechen dem ADR.")
+    print(f"✓ {len(messages)} commit message(s) match the convention.")
 
 
 if __name__ == "__main__":

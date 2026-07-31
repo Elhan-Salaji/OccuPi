@@ -1,0 +1,14 @@
+# Loads every dashboard JSON in this directory. Shared between the local and
+# the server stack — the datasource is referenced by uid (occupi-influxdb),
+# which both stacks provision.
+apiVersion: 1
+
+providers:
+  - name: occupi
+    folder: OccuPi
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 30
+    options:
+      path: /etc/grafana/provisioning/dashboards
+      foldersFromFilesStructure: false

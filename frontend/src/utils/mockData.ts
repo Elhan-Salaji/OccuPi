@@ -1,9 +1,21 @@
-import type { Room, Forecast } from '../types/room';
+import type {Room, ForecastResponse, HistoryResponse, WeekPatternResponse} from '../types/room';
 
-export const MOCK_FORECASTS: Forecast[] = [
-    { roomId: '016E', forecastTime: '14:00', predictedOccupancy: 45, probability: 0.85 },
-    { roomId: '016E', forecastTime: '15:00', predictedOccupancy: 10, probability: 0.95 }, // Vorlesungsende?
-];
+export const MOCK_FORECAST: ForecastResponse = {
+    roomId: '016E',
+    forecastHours: 5,
+    forecast: [
+        { time: "2026-06-25T14:00:00Z", predictedCount: 22.5},
+        { time: "2026-06-25T14:30:00Z", predictedCount: 18.3},
+        { time: "2026-06-25T15:00:00Z", predictedCount: 12.4},
+        { time: "2026-06-25T15:30:00Z", predictedCount: 8.0},
+        { time: "2026-06-25T16:00:00Z", predictedCount: 14.6},
+        { time: "2026-06-25T16:30:00Z", predictedCount: 13.1},
+        { time: "2026-06-25T17:00:00Z", predictedCount: 10.8},
+        ],
+        confidence: 0.85,
+        generatedAt: "2026-06-25T13:45:00Z" ,
+
+};
 
 export const MOCK_ROOMS: Room[] = [
     {
@@ -40,3 +52,100 @@ export const MOCK_ROOMS: Room[] = [
         timestamp: new Date().toISOString(),
     }
 ];
+
+export const MOCK_HISTORY: HistoryResponse = {
+    roomId: "016E",
+    points: [
+        { time: "2026-06-25T10:00:00Z", count: 5, confidence: 0.9},
+        { time: "2026-06-25T10:30:00Z", count: 7, confidence: 0.9},
+        { time: "2026-06-25T11:00:00Z", count: 10, confidence: 0.9},
+        { time: "2026-06-25T11:30:00Z", count: 15, confidence: 0.9},
+        { time: "2026-06-25T12:00:00Z", count: 23, confidence: 0.9},
+        { time: "2026-06-25T12:30:00Z", count: 28, confidence: 0.9},
+        { time: "2026-06-25T13:00:00Z", count: 22, confidence: 0.9},
+        { time: "2026-06-25T13:30:00Z", count: 15, confidence: 0.9},
+        { time: "2026-06-25T14:00:00Z", count: 7, confidence: 0.9},
+    ],
+    start: "2026-06-25T10:00:00Z",
+    end: "2026-06-25T14:00:00Z",
+};
+
+export const MOCK_WEEKPATTERN: WeekPatternResponse = {
+    roomId: "016E",
+    weeks: 8,
+    pattern: [
+        { dayOfWeek: "MONDAY", hour: 8, avgOccupancy: 5, avgRate: 0.10 },
+        { dayOfWeek: "MONDAY", hour: 9, avgOccupancy: 18, avgRate: 0.36 },
+        { dayOfWeek: "MONDAY", hour: 10, avgOccupancy: 25, avgRate: 0.50 },
+        { dayOfWeek: "MONDAY", hour: 11, avgOccupancy: 30, avgRate: 0.60 },
+        { dayOfWeek: "MONDAY", hour: 12, avgOccupancy: 22, avgRate: 0.44 },
+        { dayOfWeek: "MONDAY", hour: 13, avgOccupancy: 28, avgRate: 0.56 },
+        { dayOfWeek: "MONDAY", hour: 14, avgOccupancy: 32, avgRate: 0.64 },
+        { dayOfWeek: "MONDAY", hour: 15, avgOccupancy: 27, avgRate: 0.54 },
+        { dayOfWeek: "MONDAY", hour: 16, avgOccupancy: 20, avgRate: 0.40 },
+        { dayOfWeek: "MONDAY", hour: 17, avgOccupancy: 12, avgRate: 0.24 },
+        { dayOfWeek: "MONDAY", hour: 18, avgOccupancy: 4, avgRate: 0.08 },
+
+        { dayOfWeek: "TUESDAY", hour: 8, avgOccupancy: 3, avgRate: 0.06 },
+        { dayOfWeek: "TUESDAY", hour: 9, avgOccupancy: 20, avgRate: 0.40 },
+        { dayOfWeek: "TUESDAY", hour: 10, avgOccupancy: 28, avgRate: 0.56 },
+        { dayOfWeek: "TUESDAY", hour: 11, avgOccupancy: 33, avgRate: 0.66 },
+        { dayOfWeek: "TUESDAY", hour: 12, avgOccupancy: 25, avgRate: 0.50 },
+        { dayOfWeek: "TUESDAY", hour: 13, avgOccupancy: 30, avgRate: 0.60 },
+        { dayOfWeek: "TUESDAY", hour: 14, avgOccupancy: 28, avgRate: 0.56 },
+        { dayOfWeek: "TUESDAY", hour: 15, avgOccupancy: 22, avgRate: 0.44 },
+        { dayOfWeek: "TUESDAY", hour: 16, avgOccupancy: 15, avgRate: 0.30 },
+        { dayOfWeek: "TUESDAY", hour: 17, avgOccupancy: 8, avgRate: 0.16 },
+        { dayOfWeek: "TUESDAY", hour: 18, avgOccupancy: 2, avgRate: 0.04 },
+
+        { dayOfWeek: "WEDNESDAY", hour: 8, avgOccupancy: 8, avgRate: 0.16 },
+        { dayOfWeek: "WEDNESDAY", hour: 9, avgOccupancy: 22, avgRate: 0.44 },
+        { dayOfWeek: "WEDNESDAY", hour: 10, avgOccupancy: 30, avgRate: 0.60 },
+        { dayOfWeek: "WEDNESDAY", hour: 11, avgOccupancy: 35, avgRate: 0.70 },
+        { dayOfWeek: "WEDNESDAY", hour: 12, avgOccupancy: 28, avgRate: 0.56 },
+        { dayOfWeek: "WEDNESDAY", hour: 13, avgOccupancy: 33, avgRate: 0.66 },
+        { dayOfWeek: "WEDNESDAY", hour: 14, avgOccupancy: 35, avgRate: 0.70 },
+        { dayOfWeek: "WEDNESDAY", hour: 15, avgOccupancy: 37, avgRate: 0.73 },
+        { dayOfWeek: "WEDNESDAY", hour: 16, avgOccupancy: 25, avgRate: 0.50 },
+        { dayOfWeek: "WEDNESDAY", hour: 17, avgOccupancy: 15, avgRate: 0.30 },
+        { dayOfWeek: "WEDNESDAY", hour: 18, avgOccupancy: 5, avgRate: 0.10 },
+
+        { dayOfWeek: "THURSDAY", hour: 8, avgOccupancy: 6, avgRate: 0.12 },
+        { dayOfWeek: "THURSDAY", hour: 9, avgOccupancy: 19, avgRate: 0.38 },
+        { dayOfWeek: "THURSDAY", hour: 10, avgOccupancy: 26, avgRate: 0.52 },
+        { dayOfWeek: "THURSDAY", hour: 11, avgOccupancy: 31, avgRate: 0.62 },
+        { dayOfWeek: "THURSDAY", hour: 12, avgOccupancy: 24, avgRate: 0.48 },
+        { dayOfWeek: "THURSDAY", hour: 13, avgOccupancy: 29, avgRate: 0.58 },
+        { dayOfWeek: "THURSDAY", hour: 14, avgOccupancy: 27, avgRate: 0.54 },
+        { dayOfWeek: "THURSDAY", hour: 15, avgOccupancy: 23, avgRate: 0.46 },
+        { dayOfWeek: "THURSDAY", hour: 16, avgOccupancy: 16, avgRate: 0.32 },
+        { dayOfWeek: "THURSDAY", hour: 17, avgOccupancy: 9, avgRate: 0.18 },
+        { dayOfWeek: "THURSDAY", hour: 18, avgOccupancy: 3, avgRate: 0.06 },
+
+        { dayOfWeek: "FRIDAY", hour: 8, avgOccupancy: 4, avgRate: 0.08 },
+        { dayOfWeek: "FRIDAY", hour: 9, avgOccupancy: 15, avgRate: 0.30 },
+        { dayOfWeek: "FRIDAY", hour: 10, avgOccupancy: 22, avgRate: 0.44 },
+        { dayOfWeek: "FRIDAY", hour: 11, avgOccupancy: 26, avgRate: 0.52 },
+        { dayOfWeek: "FRIDAY", hour: 12, avgOccupancy: 20, avgRate: 0.40 },
+        { dayOfWeek: "FRIDAY", hour: 13, avgOccupancy: 18, avgRate: 0.36 },
+        { dayOfWeek: "FRIDAY", hour: 14, avgOccupancy: 14, avgRate: 0.28 },
+        { dayOfWeek: "FRIDAY", hour: 15, avgOccupancy: 10, avgRate: 0.20 },
+        { dayOfWeek: "FRIDAY", hour: 16, avgOccupancy: 6, avgRate: 0.12 },
+        { dayOfWeek: "FRIDAY", hour: 17, avgOccupancy: 3, avgRate: 0.06 },
+        { dayOfWeek: "FRIDAY", hour: 18, avgOccupancy: 1, avgRate: 0.02 },
+
+        { dayOfWeek: "SATURDAY", hour: 9, avgOccupancy: 3, avgRate: 0.06 },
+        { dayOfWeek: "SATURDAY", hour: 10, avgOccupancy: 5, avgRate: 0.10 },
+        { dayOfWeek: "SATURDAY", hour: 11, avgOccupancy: 6, avgRate: 0.12 },
+        { dayOfWeek: "SATURDAY", hour: 12, avgOccupancy: 4, avgRate: 0.08 },
+        { dayOfWeek: "SATURDAY", hour: 13, avgOccupancy: 3, avgRate: 0.06 },
+        { dayOfWeek: "SATURDAY", hour: 14, avgOccupancy: 2, avgRate: 0.04 },
+
+        { dayOfWeek: "SUNDAY", hour: 10, avgOccupancy: 2, avgRate: 0.04 },
+        { dayOfWeek: "SUNDAY", hour: 11, avgOccupancy: 2, avgRate: 0.04 },
+        { dayOfWeek: "SUNDAY", hour: 12, avgOccupancy: 1, avgRate: 0.02 },
+        { dayOfWeek: "SUNDAY", hour: 13, avgOccupancy: 1, avgRate: 0.02 },
+    ],
+    peakTime: { dayOfWeek: "WEDNESDAY", hour: 15, avgRate: 0.73 },
+    quietTime: { dayOfWeek: "SUNDAY", hour: 12, avgRate: 0.02 },
+};

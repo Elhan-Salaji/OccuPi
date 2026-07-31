@@ -10,7 +10,7 @@ export const Login = () => {
     const login = useAuthStore((state) => state.login);
     const navigate = useNavigate();
 
-    // Task: Form validation & Submit handling
+    // Form validation & Submit handling
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setError('');
@@ -98,7 +98,7 @@ export const Login = () => {
 
                 {/* footer*/}
                 <div className="mt-8 text-center border-t border-[#F3F4F6] pt-6">
-                    {/* Hier kann optional eine Fußnote hin */}
+                    {/* optional footnote goes here */}
                 </div>
 
             </div>

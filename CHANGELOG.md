@@ -7,6 +7,242 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-07-31
+
+Second full release. Adds bulk CSV import/export for rooms, folds the
+per-directory READMEs and decision logs into the root README and the wiki, and
+carries the accumulated fixes and hardening since v0.1.0.
+
+### Added
+- `POST /api/rooms/import` and `GET /api/rooms/export` for bulk CSV room
+  management: export streams the current room list as `rooms.csv`, import
+  upserts by `roomId` and is all-or-nothing — a single invalid row rejects the
+  whole file with `400` and a per-row reason, so the table is never left
+  half-written. Admin-only, like the other room mutations (#343).
+- CSV import and export buttons next to the room table in the Admin Panel. Export
+  downloads the current room list as `rooms.csv`; import uploads a file to the
+  bulk endpoint and reports how many rooms were created and updated. A rejected
+  file is listed row by row with the reason the backend gave, and since the import
+  is all-or-nothing the table stays untouched in that case. First upload/download
+  UI in the frontend, so it sets the pattern for later CSV features (#345).
+- `docker/server/`: the deliberately configured counterpart to `docker/local/`. One
+  `.env.example` that must be filled completely — the compose file fail-fasts with
+  `${VAR:?}` on every missing required value (Postgres, Keycloak admin, Grafana
+  admin, `PUBLIC_HOST`, `CORS_ALLOWED_ORIGINS`, `INFLUXDB_TOKEN`), so no silent
+  default passwords survive on a server. Backend and frontend build from source with
+  `VITE_*` derived from `PUBLIC_HOST`; every port binds to 127.0.0.1 (nginx stays the
+  only public entry). InfluxDB runs WITH token auth (bootstrap documented; the
+  healthcheck sends the token — `/health` answers 401 without one). The realm import
+  file uses `${OCCUPI_PUBLIC_URL}` placeholders, substitution verified against
+  Keycloak 26.2. The project name is pinned to `occupi` and the data volumes attach
+  externally to the legacy names (`docker_influxdb3-data`, `docker_postgres-data`) —
+  the VM keeps every byte across the restructure; fresh servers create the two
+  volumes once (#314).
+- `docker/local/`: the complete stack in one command. `cd docker/local && docker
+  compose up -d --build` starts backend + frontend (built from source with
+  localhost URLs), Postgres, Keycloak (imports a localhost realm with seeded test
+  users `occupi-admin`/`occupi-user` AND the HdM LDAP federation, so HdM logins work
+  locally inside the HdM network), InfluxDB 3, Grafana on :3001 (FlightSQL
+  datasource + room dashboard provisioned, `$room` variable) and a mock fleet that
+  simulates one Pi per `MOCK_ROOMS` entry — each with its own `sensorId` and
+  capacity, fixing the old mock's shared-identity bug. The same `MOCK_ROOMS` value
+  seeds the rooms into Postgres at startup: a fresh clone shows live per-room data
+  without a single click. The committed `.env` holds the one value to touch
+  (`MOCK_ROOMS`) plus commented defaults; the auth flow is one uncommented variable
+  away (`SPRING_PROFILES_ACTIVE=prod`). The legacy `docker/` compose files stay
+  untouched until the server has moved (#313).
+- Sensor admin API for the panel's correction path: `GET /api/sensors` lists every
+  device with claim, effective room, derived status (claimed / overridden /
+  unresolved), last seen and dropped-point counters; `PUT /api/sensors/{id}/assignment`
+  assigns a room (override), `DELETE .../assignment` clears it, `PUT /{id}` renames,
+  `DELETE /{id}` removes the entry. Writes require the Keycloak `admin` role at both
+  the URL and method level, like rooms. Deleting a room that still has assigned
+  sensors now fails with `409` naming the sensors instead of an opaque error (#311).
+- Sensor registry: every Pi that ever reported gets a row in the new Postgres
+  `sensors` table (device id, claimed room, admin override, last seen). The room id a
+  Pi sends is now a *claim* — it flows into exactly that room the moment a matching
+  room exists, with no admin step. An admin override corrects a wrong claim and
+  expires automatically when the Pi reports a new claim (a freshly edited Pi `.env`
+  wins over an old correction); an override is a real foreign key, so a room with
+  assigned sensors cannot be deleted. Data from an unresolved device (claim matches
+  no room) is no longer written under an invisible tag — the old silent-typo trap:
+  the points are dropped and counted, the device stays visible with `lastSeen` via
+  its metrics stream, and both the persisted point and the `/topic/occupancy`
+  broadcast always carry the *effective* room. Ingest ids are validated
+  (`[A-Za-z0-9._-]{1,64}`), auto-registration is capped
+  (`OCCUPI_SENSOR_AUTOREGISTER_CAP`, default 100) because `/ws` is unauthenticated,
+  and a registry outage drops single messages instead of killing the STOMP session (#310).
+- The backend seeds rooms at startup when `OCCUPI_SEED_ROOMS` is set
+  (`roomId:capacity` pairs, e.g. `006:20,011:15`): create-if-missing, existing rooms
+  are never touched, a malformed spec aborts startup with a message naming the bad
+  entry. Built for the upcoming one-command local stack, where the same value drives
+  the mock Pi fleet and the room seed; unset (the server case) the seeder is inert (#312).
+- Server-side demo data seed (`deploy/seed-demo-data.py`): drops and rewrites the
+  InfluxDB `occupancy` table with eight weeks of 5-minute occupancy history — as
+  backfill for the live demo rooms and shaped per dashboard edge case for the static
+  ones (over-capacity ring, empty room, stale timestamp, >500 points in 24 h for
+  downsampling, chart gaps with reduced forecast confidence, a night-only room
+  without a quiet time, all-empty states, the historical 7/0 case). The script
+  upserts the matching Postgres rooms, recreates the `occupancy_latest_by_room`
+  cache and restarts the backend so its caches match the new table; the `metrics`
+  table and room 137's registry entry stay untouched. Meant to be re-run before
+  each demo (#300).
+- The Pi sender has a demo mode (`SENSOR_MODE=demo`, compose profile `demo`) for the
+  live dashboard demo: one hardware-free container walks the configured rooms
+  (`DEMO_ROOMS`, `roomId:capacity` pairs) through the traffic-light bands in small
+  steps, occasionally overshoots capacity for a few minutes to trigger the
+  over-capacity pulse (#244), and emits synthetic Pi-health snapshots — one healthy,
+  one warning, one critical sensor — for the admin metrics section (#224). Everything
+  goes over the regular STOMP path at moderate rates (15 s occupancy / 45 s metrics
+  by default), so the frontend updates live without a reload and InfluxDB stays
+  inside the parquet-file-limit guidance from #294. Without a `.env` the demo
+  container defaults straight to the production endpoint (#297).
+- Occupancy history and weekly-pattern REST endpoints for the room detail view:
+  `GET /api/occupancy/history` returns the recent time series (raw points within 24h,
+  downsampled to 30-minute slots beyond that), and `GET /api/occupancy/weekpattern`
+  returns the per-weekday/hour averages over the last N weeks with the peak and quiet
+  times (#199).
+- Wired the real TI IWR6843 mmWave radar into the Pi sender: `sensor-01` in
+  `raspberry/compose.yml` maps the radar's two CP2105 USB serial ports and adds the
+  `dialout` group, so on the Pi a plain `docker compose up` with `SENSOR_MODE=real` streams
+  live occupancy for room 137 (#201).
+
+### Removed
+- Every documentation file except the root `README.md`: `docs/adr/` (the four
+  repo-wide ADRs), the per-part logs `backend/docs/decisions.md` and
+  `raspberry/docs/` (hardware, radar physics, the TLV data format, the chirp config
+  reference, the mounting decision), and the six per-directory READMEs under
+  `docker/`, `docker/local/`, `docker/server/`, `deploy/`, `frontend/` and
+  `raspberry/`. The wiki already carries all of it, and two copies of the same
+  decision drift apart. What the sub-READMEs held operationally moved into the root
+  README, so the local stack, the real Pi, the frontend build, the server setup
+  including the InfluxDB token bootstrap, auto-deploy and the demo seed are all in
+  one file now. `CONTRIBUTING.md` and the comments in `deploy/` point at the wiki
+  and the README instead of at deleted paths (#341).
+- The legacy compose structure: `docker/docker-compose.yml` with its `override` and
+  `prod` overlays, `docker/.env.example`, the realm file in `docker/keycloak/` and
+  the init script in `docker/postgres/` (the deleted base was their only consumer;
+  `docker/shared/postgres-init/` serves both stacks now), plus the orphaned
+  `frontend/grafana/compose.yml`. The server has run on `docker/server/` since the
+  cutover, so all these files still held was a rollback path nobody needs.
+  `docker/README.md` becomes an index over the two stacks and keeps the InfluxDB
+  numbers they share (the `--query-file-limit` arithmetic, the resource cap); the
+  migration runbook in `deploy/README.md` goes with the files its steps named, and
+  the volume-adoption note it carried moved to `docker/server/README.md` (#318).
+- `.github/workflows/images.yml` (GHCR image publishing): with both stacks building
+  from source there is no consumer left for registry images, and keeping a publisher
+  nobody deploys invites digest drift. Decision and the rejected runtime-config
+  alternative are recorded in ADR 0004 (#321).
+
+### Changed
+- The repo speaks English throughout: the commit checker's CI output, the docstring
+  and comments in `raspberry/sender/processor.py`, and the last German comments in
+  the frontend (`useRoomStore.ts`, `types/room.ts`, `Login.tsx`,
+  `WeekPatternHeatmap.tsx`) — including the one German `console.error` in
+  `useFetchRooms.ts`, which is dev-facing log output rather than a UI string, and a
+  handful of machine-translation artefacts that read as English but named the wrong
+  thing. The README and the Pi's `.env.example` now name the sensor status the API
+  actually returns (`UNRESOLVED`) instead of a German word no screen ever showed.
+  The frontend's user-facing strings stay German — that is a product decision, not
+  a docs one (#341).
+- Repo-wide decisions now live in `docs/adr/` (configuration via env, sensor
+  claim/override mapping, local-vs-server layout incl. volume adoption, server
+  builds from source); the per-part logs in `backend/docs/` and `raspberry/docs/`
+  link there. The root README is rewritten around the new structure: three-command
+  quick start, how-to for adding a room and a real Pi, per-stack configuration
+  reference, updated troubleshooting and honest known gaps (ingest auth #322,
+  no re-tagging of historical points, ddl-auto without Flyway) (#321).
+- `raspberry/` is the real Pi only now: one Pi = one radar = one room = one
+  container. The new `raspberry/docker/` compose starts exactly one sensor service;
+  the radar unit is selected via `RADAR_SERIAL` (its CP2105 by-id serial) instead of
+  a hardcoded device path, and `ROOM_ID`/`SENSOR_ID` are required — both compose and
+  `config.validate()` fail fast, because the old silent defaults
+  (`room-01`/`sensor-01`) fed phantom rooms on typos. Mock and demo moved to the
+  local stack: the scripted dashboard scenario (traffic-light bands, over-capacity
+  pulses, health profiles) now runs as `MOCK_MODE=demo` in `docker/local/mock/`,
+  incl. against the production endpoint for presentations. `mock_data.py`,
+  `demo_data.py`, `run.sh`, the old `raspberry/compose.yml` (sensor-01/02/demo
+  services) and the stale chirp-config reference in `docs/decisions.md` are gone
+  (#316).
+- Auto-deploy builds from source now: the systemd timer stays exactly as it is
+  (5-minute tick, same units), but `deploy/auto-deploy.sh` triggers on new commits
+  on `origin/develop` instead of moved GHCR digests, builds backend and frontend
+  serially against `docker/server/compose.yml`, health-gates both, and rolls back
+  by resetting to the last good commit and rebuilding (minutes, not seconds — the
+  accepted cost for images that no longer depend on a registry or a baked-in
+  hostname). A swap file is now a documented prerequisite: an unswapped on-server
+  build killed the VM once (#140). The full VM cutover — volume adoption, Influx
+  token bootstrap, timer conversion table, rollback — lives as a runbook in
+  `deploy/README.md` (#315).
+- The backend's InfluxDB connection (`INFLUXDB_URL`/`INFLUXDB_DATABASE`/`INFLUXDB_TOKEN`)
+  and the CORS origins (`CORS_ALLOWED_ORIGINS`, comma-separated patterns) are now plain
+  environment variables with the previous values as local defaults. The origin list is
+  one property consumed by both the HTTP CORS config and the WebSocket handshake — the
+  two hardcoded copies could drift apart before. The open `dev` profile now logs a loud
+  startup warning, since it is the default for unconfigured deployments (#309).
+- Re-sliced the backend into strict package-by-feature. The layer-style packages
+  `feature/database`, `feature/receiver` and `feature/provider` are gone: the occupancy
+  and Pi-metrics domains each own their ingestion, persistence and read API in
+  `feature/occupancy` and `feature/metrics`. App-wide infrastructure now sits in
+  `config` (CORS, caching, WebSocket/STOMP, InfluxDB client and last-cache initializer,
+  global exception handler), the security filter chains and the Keycloak role converter
+  in `security`, and the shared helpers `InfluxTime`/`TimeSlots` in `common`; the
+  decision is recorded in `backend/docs/decisions.md`. Java packages only: class names,
+  REST paths and STOMP destinations are unchanged (#307).
+- InfluxDB now runs with `--query-file-limit 10000` (default 432) in the base compose
+  command. InfluxDB 3 Core never compacts its 10-minute gen1 parquet files (up to 144
+  per table and day), so the default limit rejected every read wider than ~3–4 days —
+  the 8-week week-pattern chart alone needs up to ~8,064 files at full write cadence.
+  The raise is safe on this host: the files are ~7 KB each and the #273 CPU/memory
+  caps stay on as backstop. Auto-deploy leaves infra containers alone, so applying
+  it needs a manual `docker compose ... up -d influxdb` (#294).
+- The InfluxDB container now runs under a hard resource ceiling in the production
+  compose (0.5 CPU, 2 GiB memory) so one heavy query can never starve the single-core
+  host again. InfluxDB 3 Core does not cancel a running query when the client
+  disconnects, so this cap is the backstop that keeps the box reachable. Auto-deploy
+  only recreates backend/frontend, so applying it needs a manual
+  `docker compose ... up -d influxdb` (#273).
+- The room-detail reads (`GET /api/occupancy/history`, `/api/forecast`,
+  `/api/occupancy/weekpattern`) are now cached in memory (Caffeine), keyed by room and
+  window. Opening a room or switching the hour filter re-ran all three — including a full
+  8-week week-pattern scan and the forecast's four lookback queries — every time and once
+  per concurrent viewer; on the single-core host these serialized on the CPU-capped
+  InfluxDB and everyone waited. Repeated and concurrent requests now share one
+  computation, with short per-endpoint TTLs and a bounded cache size (#280).
+
+### Fixed
+- The dashboard's "latest per room / per sensor" reads work again and no longer
+  depend on parquet files at all: they are served from InfluxDB's in-memory last
+  value cache, which the backend creates idempotently at startup (key `roomId` /
+  `sensorId`, TTL = `*.latest-lookback-days`). The former 7-day window-function
+  scan started failing InfluxDB 3 Core's 432-parquet-file query limit once ~4 days
+  of gen1 files had accumulated — `GET /api/occupancy/all` returned 500 and every
+  room except the live-streaming 137 showed as unavailable. While the cache is
+  cold right after an InfluxDB restart, a scan bounded to
+  `*.latest-fallback-days` (default 2) fills the gap; the previously unbounded
+  single-room reads now use the same bounded fallback. Client-controlled windows
+  are capped server-side (history/forecast ≤ 168 h, week-pattern ≤ 8 weeks,
+  metrics history ≤ `metrics.history-max-days`) so a single request can never
+  exceed the file limit (#294).
+- `POST /api/rooms` now rejects a create whose `roomId` already exists with
+  `409 Conflict` instead of silently overwriting the stored room. Rooms use an
+  assigned ID, so `save()` on a duplicate acted as an update and corrupted the
+  existing room's metadata; the admin panel already shows "Raum-ID existiert
+  bereits." for the 409 (#248).
+- The "latest per room / per sensor" reads no longer scan the entire InfluxDB history
+  on every call. The window-function queries in `OccupancyRepository.findAllLatest`
+  and `MetricsRepository.findAllLatest` are now bounded to a configurable recent
+  window (`occupancy.latest-lookback-days` / `metrics.latest-lookback-days`, default
+  7 days). An unbounded scan of a full year of data took about 7 minutes and, polled
+  every 30 s by the frontend, pinned the single-core server's only CPU and made the
+  whole machine unreachable over SSH; the bounded query returns in under a second (#273).
+
+### Security
+- Room create, update and delete (`POST`/`PUT`/`DELETE /api/rooms`) now require the
+  Keycloak `admin` realm role, enforced with method security (`@PreAuthorize`) on the
+  controller on top of the existing URL rules. Reads (`GET`) stay open to any
+  authenticated user (#219).
+
 ## [0.1.0] - 2026-06-20
 
 First full release. The complete OccuPi system now runs live on the HdM server:

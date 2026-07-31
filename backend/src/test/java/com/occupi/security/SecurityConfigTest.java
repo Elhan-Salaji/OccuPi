@@ -1,0 +1,144 @@
+package com.occupi.security;
+
+import com.occupi.feature.room.RoomController;
+import com.occupi.feature.room.RoomCsvService;
+import com.occupi.feature.room.RoomService;
+import com.occupi.feature.room.dto.RoomResponse;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.context.annotation.Import;
+import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.web.servlet.MockMvc;
+
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.when;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+/**
+ * Verifies the OAuth2 Resource Server authorization rules in {@link SecurityConfig}
+ * against the room endpoints (read = any authenticated user, mutations = ADMIN).
+ */
+@WebMvcTest(RoomController.class)
+@Import(SecurityConfig.class)
+@ActiveProfiles("prod")
+@DisplayName("SecurityConfig authorization rules")
+class SecurityConfigTest {
+
+    @Autowired
+    private MockMvc mvc;
+
+    @MockitoBean
+    private RoomService roomService;
+
+    @MockitoBean
+    private RoomCsvService roomCsvService;
+
+    @MockitoBean
+    private JwtDecoder jwtDecoder;
+
+    @Test
+    @DisplayName("rejects an unauthenticated request with 401")
+    void getRooms_noToken_returns401() throws Exception {
+        mvc.perform(get("/api/rooms"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    @DisplayName("allows a read for any authenticated user")
+    void getRooms_authenticated_returns200() throws Exception {
+        mvc.perform(get("/api/rooms").with(jwt()))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    @DisplayName("rejects a room mutation with 403 when the token lacks ADMIN")
+    void createRoom_nonAdmin_returns403() throws Exception {
+        mvc.perform(post("/api/rooms")
+                        .contentType("application/json")
+                        .content("{\"roomId\":\"room-1\",\"name\":\"X\",\"building\":\"M\",\"floor\":1,\"capacity\":10}")
+                        .with(jwt()))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("allows a room mutation for an ADMIN token")
+    void createRoom_admin_returns201() throws Exception {
+        when(roomService.createRoom(any()))
+                .thenReturn(new RoomResponse("room-1", "X", "M", 1, 10));
+
+        mvc.perform(post("/api/rooms")
+                        .contentType("application/json")
+                        .content("{\"roomId\":\"room-1\",\"name\":\"X\",\"building\":\"M\",\"floor\":1,\"capacity\":10}")
+                        .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_ADMIN"))))
+                .andExpect(status().isCreated());
+    }
+
+    @Test
+    @DisplayName("rejects a room update with 403 when the token lacks ADMIN")
+    void updateRoom_nonAdmin_returns403() throws Exception {
+        mvc.perform(put("/api/rooms/room-1")
+                        .contentType("application/json")
+                        .content("{\"roomId\":\"room-1\",\"name\":\"X\",\"building\":\"M\",\"floor\":1,\"capacity\":10}")
+                        .with(jwt()))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("allows a room update for an ADMIN token")
+    void updateRoom_admin_returns200() throws Exception {
+        when(roomService.updateRoom(any(), any()))
+                .thenReturn(new RoomResponse("room-1", "X", "M", 1, 10));
+
+        mvc.perform(put("/api/rooms/room-1")
+                        .contentType("application/json")
+                        .content("{\"roomId\":\"room-1\",\"name\":\"X\",\"building\":\"M\",\"floor\":1,\"capacity\":10}")
+                        .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_ADMIN"))))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    @DisplayName("rejects a room deletion with 403 when the token lacks ADMIN")
+    void deleteRoom_nonAdmin_returns403() throws Exception {
+        mvc.perform(delete("/api/rooms/room-1").with(jwt()))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("allows a room deletion for an ADMIN token")
+    void deleteRoom_admin_returns204() throws Exception {
+        mvc.perform(delete("/api/rooms/room-1")
+                        .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_ADMIN"))))
+                .andExpect(status().isNoContent());
+    }
+
+    @Test
+    @DisplayName("allows a CSV export for any authenticated user")
+    void exportCsv_authenticated_returns200() throws Exception {
+        when(roomCsvService.export(any())).thenReturn("roomId,name,building,floor,capacity\r\n");
+
+        mvc.perform(get("/api/rooms/export").with(jwt()))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    @DisplayName("rejects a CSV import with 403 when the token lacks ADMIN")
+    void importCsv_nonAdmin_returns403() throws Exception {
+        MockMultipartFile file =
+                new MockMultipartFile("file", "rooms.csv", "text/csv", "csv".getBytes());
+
+        mvc.perform(multipart("/api/rooms/import").file(file).with(jwt()))
+                .andExpect(status().isForbidden());
+    }
+}

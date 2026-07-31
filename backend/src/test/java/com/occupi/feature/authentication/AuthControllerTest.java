@@ -1,6 +1,7 @@
 package com.occupi.feature.authentication;
 
 import com.occupi.feature.authentication.dto.UserInfoResponse;
+import com.occupi.security.SecurityConfig;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;

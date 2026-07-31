@@ -2,3 +2,5 @@ pyserial==3.5
 stomp.py==8.1.2
 psutil==7.2.2
 certifi==2026.6.17
+matplotlib>=3.8
+numpy>=1.26

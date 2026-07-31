@@ -1,7 +1,10 @@
 package com.occupi.feature.room;
 
+import com.occupi.feature.room.dto.RoomImportResult;
 import com.occupi.feature.room.dto.RoomRequest;
 import com.occupi.feature.room.dto.RoomResponse;
+import com.occupi.feature.sensor.Sensor;
+import com.occupi.feature.sensor.SensorRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -22,6 +25,9 @@ class RoomServiceImplTest {
 
     @Mock
     private RoomRepository roomRepository;
+
+    @Mock
+    private SensorRepository sensorRepository;
 
     @InjectMocks
     private RoomServiceImpl service;
@@ -78,6 +84,16 @@ class RoomServiceImplTest {
     }
 
     @Test
+    @DisplayName("createRoom throws RoomAlreadyExistsException for a duplicate roomId")
+    void createRoom_duplicate_throws() {
+        when(roomRepository.existsById("room-9")).thenReturn(true);
+
+        assertThatThrownBy(() -> service.createRoom(request("room-9")))
+                .isInstanceOf(RoomAlreadyExistsException.class);
+        verify(roomRepository, never()).save(any());
+    }
+
+    @Test
     @DisplayName("updateRoom updates fields of an existing room")
     void updateRoom_existing() {
         when(roomRepository.findById("room-1")).thenReturn(Optional.of(room("room-1")));
@@ -113,6 +129,21 @@ class RoomServiceImplTest {
     }
 
     @Test
+    @DisplayName("deleteRoom is blocked with 409 while sensors are assigned to the room")
+    void deleteRoom_withAssignedSensors_throwsConflict() {
+        when(roomRepository.existsById("room-1")).thenReturn(true);
+        when(sensorRepository.findByOverrideRoomId("room-1")).thenReturn(List.of(
+                Sensor.builder().sensorId("pi-a").build(),
+                Sensor.builder().sensorId("pi-b").build()));
+
+        assertThatThrownBy(() -> service.deleteRoom("room-1"))
+                .isInstanceOf(RoomHasAssignedSensorsException.class)
+                .hasMessageContaining("pi-a")
+                .hasMessageContaining("pi-b");
+        verify(roomRepository, never()).deleteById(anyString());
+    }
+
+    @Test
     @DisplayName("deleteRoom throws RoomNotFoundException for unknown room")
     void deleteRoom_missing_throws() {
         when(roomRepository.existsById("ghost")).thenReturn(false);
@@ -120,5 +151,30 @@ class RoomServiceImplTest {
         assertThatThrownBy(() -> service.deleteRoom("ghost"))
                 .isInstanceOf(RoomNotFoundException.class);
         verify(roomRepository, never()).deleteById(anyString());
+    }
+
+    @Test
+    @DisplayName("importRooms upserts and reports created vs updated counts")
+    void importRooms_countsCreatedAndUpdated() {
+        when(roomRepository.existsById("room-1")).thenReturn(true);   // exists → update
+        when(roomRepository.existsById("room-2")).thenReturn(false);  // new → create
+        when(roomRepository.save(any(Room.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        RoomImportResult result = service.importRooms(List.of(request("room-1"), request("room-2")));
+
+        assertThat(result.created()).isEqualTo(1);
+        assertThat(result.updated()).isEqualTo(1);
+        assertThat(result.errors()).isEmpty();
+        verify(roomRepository, times(2)).save(any(Room.class));
+    }
+
+    @Test
+    @DisplayName("importRooms on an empty list saves nothing")
+    void importRooms_empty() {
+        RoomImportResult result = service.importRooms(List.of());
+
+        assertThat(result.created()).isZero();
+        assertThat(result.updated()).isZero();
+        verify(roomRepository, never()).save(any());
     }
 }
